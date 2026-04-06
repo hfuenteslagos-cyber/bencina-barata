@@ -1,156 +1,198 @@
-// Netlify serverless function - scrapea preciobencina.cl
+// Netlify serverless function - API oficial CNE (Comision Nacional de Energia)
 const https = require('https');
-const http = require('http');
 
-const SCRAPE_URL = 'https://preciobencina.cl/bencineras-en-region-de-antofagasta.php';
+const CNE_LOGIN_URL = 'https://api.cne.cl/api/login';
+const CNE_ESTACIONES_URL = 'https://api.cne.cl/api/v4/estaciones';
+const REGION_ANTOFAGASTA = '02';
 
 // Cache en memoria (persiste entre invocaciones en caliente)
 let cache = { data: null, timestamp: 0 };
 const CACHE_TTL = 3600000; // 1 hora en ms
 
+// Token cache
+let tokenCache = { token: null, timestamp: 0 };
+const TOKEN_TTL = 3500000; // ~58 min (token dura 1hr)
+
 exports.handler = async (event) => {
+  const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
   const forceRefresh = event.queryStringParameters && event.queryStringParameters.refresh === '1';
   const now = Date.now();
 
   // Devolver cache si es valido
   if (!forceRefresh && cache.data && (now - cache.timestamp) < CACHE_TTL) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ ...cache.data, cached: true }),
-    };
+    return { statusCode: 200, headers, body: JSON.stringify({ ...cache.data, cached: true }) };
   }
 
   try {
-    const html = await fetchPage(SCRAPE_URL);
-    const estaciones = parseMarkers(html);
+    // 1. Obtener token
+    const token = await getToken();
 
-    if (estaciones.length >= 5) {
+    // 2. Obtener estaciones
+    const raw = await fetchJSON(CNE_ESTACIONES_URL, token);
+
+    // 3. Filtrar Region de Antofagasta y mapear
+    const estaciones = parseEstaciones(raw);
+
+    if (estaciones.length >= 3) {
       cache = {
-        data: { estaciones, source: 'preciobencina.cl', count: estaciones.length, updated: now },
+        data: { estaciones, source: 'CNE (api.cne.cl)', count: estaciones.length, updated: now },
         timestamp: now,
       };
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify(cache.data),
-      };
+      return { statusCode: 200, headers, body: JSON.stringify(cache.data) };
     }
   } catch (err) {
-    console.error('Scrape error:', err.message);
+    console.error('CNE API error:', err.message);
   }
 
-  // Fallback
+  // Fallback si la API falla
   return {
-    statusCode: 200,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    statusCode: 200, headers,
     body: JSON.stringify({ estaciones: getFallback(), source: 'fallback', count: getFallback().length }),
   };
 };
 
-function fetchPage(url) {
+async function getToken() {
+  const now = Date.now();
+  if (tokenCache.token && (now - tokenCache.timestamp) < TOKEN_TTL) {
+    return tokenCache.token;
+  }
+
+  const email = process.env.CNE_EMAIL;
+  const password = process.env.CNE_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error('CNE_EMAIL y CNE_PASSWORD no configurados en variables de entorno');
+  }
+
+  const body = JSON.stringify({ email, password });
+  const data = await postJSON(CNE_LOGIN_URL, body);
+
+  if (!data.token) throw new Error('Login CNE fallido: ' + JSON.stringify(data));
+
+  tokenCache = { token: data.token, timestamp: now };
+  return data.token;
+}
+
+function postJSON(url, body) {
   return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https') ? https : http;
-    const req = mod.get(url, {
+    const parsed = new URL(url);
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname,
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'text/html',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
       },
-      timeout: 12000,
+      timeout: 15000,
     }, (res) => {
-      // Follow redirects
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchPage(res.headers.location).then(resolve).catch(reject);
-      }
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve(data));
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('JSON parse error: ' + data.substring(0, 200))); }
+      });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.write(body);
+    req.end();
   });
 }
 
-function parseMarkers(html) {
+function fetchJSON(url, token) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/json',
+      },
+      timeout: 15000,
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('JSON parse error: ' + data.substring(0, 200))); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.end();
+  });
+}
+
+function parseEstaciones(raw) {
   const estaciones = [];
-  // L.marker([lat, lng], ...).bindPopup('...')
-  const re = /L\.marker\(\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\].*?\.bindPopup\('(.*?)'\)/gs;
-  let match;
-  let idx = 0;
 
-  while ((match = re.exec(html)) !== null) {
+  // La API puede devolver un array directo o un objeto con propiedad
+  const lista = Array.isArray(raw) ? raw : (raw.data || raw.estaciones || []);
+
+  for (const e of lista) {
     try {
-      const lat = parseFloat(match[1]);
-      const lng = parseFloat(match[2]);
-      let popup = match[3].replace(/\\'/g, "'").replace(/\\n/g, "\n");
+      const ubi = e.ubicacion || {};
+      const region = ubi.codigo_region || ubi.region_id || '';
 
-      // Brand
-      const brandM = popup.match(/<h3[^>]*>(.*?)<\/h3>/s);
-      const brandRaw = brandM ? stripHtml(brandM[1]) : 'Desconocida';
+      // Solo Region de Antofagasta
+      if (String(region) !== REGION_ANTOFAGASTA && String(region) !== '2') continue;
 
-      // Address
-      const addrM = popup.match(/<h4[^>]*>.*?<\/i>\s*(.*?)<\/h4>/s);
-      let direccion = addrM ? stripHtml(addrM[1]).trim() : '';
-      let comuna = '';
+      const lat = parseFloat(ubi.latitud || ubi.lat || 0);
+      const lng = parseFloat(ubi.longitud || ubi.lng || ubi.lon || 0);
+      if (lat === 0 || lng === 0) continue;
 
-      const known = ['Antofagasta','Tocopilla','Calama','Mejillones','Taltal','San Pedro de Atacama','Sierra Gorda','Maria Elena'];
-      if (direccion.includes(',')) {
-        const parts = direccion.split(',');
-        const last = parts[parts.length - 1].trim();
-        if (known.some(c => last.toLowerCase().includes(c.toLowerCase()))) {
-          comuna = last;
-          direccion = parts.slice(0, -1).join(',').trim();
-        } else {
-          comuna = guessComuna(lat, lng);
-        }
-      } else {
-        comuna = guessComuna(lat, lng);
+      const distribuidor = normalizeBrand(
+        (e.distribuidor && (e.distribuidor.marca || e.distribuidor.nombre)) ||
+        e.distribuidor_marca || e.marca || 'Desconocida'
+      );
+
+      const direccion = ubi.direccion || ubi.calle || '';
+      const comuna = ubi.nombre_comuna || ubi.comuna || guessComuna(lat, lng);
+      const id = e.codigo || e.id || `s${estaciones.length}`;
+
+      // Precios
+      const precios = {};
+      const preciosRaw = e.precios || {};
+
+      // Formato: { "93": {"precio": 1513}, "95": {...}, "97": {...}, "DI": {...}, "KE": {...} }
+      if (preciosRaw['93'] && preciosRaw['93'].precio) precios['Gasolina 93'] = parseInt(preciosRaw['93'].precio);
+      if (preciosRaw['95'] && preciosRaw['95'].precio) precios['Gasolina 95'] = parseInt(preciosRaw['95'].precio);
+      if (preciosRaw['97'] && preciosRaw['97'].precio) precios['Gasolina 97'] = parseInt(preciosRaw['97'].precio);
+      if (preciosRaw['DI'] && preciosRaw['DI'].precio) precios['Diesel'] = parseInt(preciosRaw['DI'].precio);
+      if (preciosRaw['KE'] && preciosRaw['KE'].precio) precios['Kerosene'] = parseInt(preciosRaw['KE'].precio);
+
+      // Formato alternativo: { gasolina_93: 1513, ... }
+      if (Object.keys(precios).length === 0) {
+        if (preciosRaw.gasolina_93) precios['Gasolina 93'] = parseInt(preciosRaw.gasolina_93);
+        if (preciosRaw.gasolina_95) precios['Gasolina 95'] = parseInt(preciosRaw.gasolina_95);
+        if (preciosRaw.gasolina_97) precios['Gasolina 97'] = parseInt(preciosRaw.gasolina_97);
+        if (preciosRaw.diesel) precios['Diesel'] = parseInt(preciosRaw.diesel);
+        if (preciosRaw.kerosene) precios['Kerosene'] = parseInt(preciosRaw.kerosene);
       }
 
-      // Prices
-      const precios = {};
-      const p93 = popup.match(/(?:Bencina|Gasolina)\s*93.*?\$\s*([\d.,]+)/);
-      if (p93) precios['Gasolina 93'] = parsePrice(p93[1]);
-      const p95 = popup.match(/(?:Bencina|Gasolina)\s*95.*?\$\s*([\d.,]+)/);
-      if (p95) precios['Gasolina 95'] = parsePrice(p95[1]);
-      const p97 = popup.match(/(?:Bencina|Gasolina)\s*97.*?\$\s*([\d.,]+)/);
-      if (p97) precios['Gasolina 97'] = parsePrice(p97[1]);
-      const pd = popup.match(/[Dd]iesel.*?\$\s*([\d.,]+)/);
-      if (pd) precios['Diesel'] = parsePrice(pd[1]);
-      const pk = popup.match(/[Kk]erosene.*?\$\s*([\d.,]+)/);
-      if (pk) precios['Kerosene'] = parsePrice(pk[1]);
-
-      const idM = popup.match(/detalles-bencinera\.php\?i=(\w+)/);
-      const id = idM ? idM[1] : `s${++idx}`;
-
-      const distribuidor = normalizeBrand(brandRaw);
-
-      if (Object.keys(precios).length > 0 && lat !== 0) {
+      if (Object.keys(precios).length > 0) {
         estaciones.push({
           id, nombre: `${distribuidor} - ${direccion}`, direccion, comuna,
           distribuidor, lat, lng, precios,
         });
       }
-    } catch (e) { continue; }
+    } catch (err) { continue; }
   }
   return estaciones;
 }
 
-function stripHtml(s) { return s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#039;/g, "'").replace(/&quot;/g, '"').trim(); }
-
-function parsePrice(s) {
-  const n = parseInt(s.replace(/\./g, '').replace(/,/g, ''));
-  return n > 100 ? n : 0;
-}
-
 function normalizeBrand(b) {
-  const u = b.toUpperCase();
+  const u = String(b).toUpperCase();
   if (u.includes('COPEC')) return 'Copec';
   if (u.includes('SHELL')) return 'Shell';
   if (u.includes('PETROBRAS') || u.includes('ENEX')) return 'Petrobras';
   if (u.includes('TERPEL')) return 'Terpel';
   if (u.includes('ARAUCO')) return 'Arauco';
-  return b.trim();
+  return String(b).trim();
 }
 
 function guessComuna(lat, lng) {
@@ -160,15 +202,14 @@ function guessComuna(lat, lng) {
   if (lat > -22.50 && lat < -22.40 && lng > -69.00 && lng < -68.85) return 'Calama';
   if (lat > -25.45 && lat < -25.35 && lng > -70.55 && lng < -70.40) return 'Taltal';
   if (lat > -22.95 && lat < -22.85 && lng > -68.25 && lng < -68.15) return 'San Pedro de Atacama';
-  if (lat > -22.95 && lat < -22.85 && lng > -69.40 && lng < -69.25) return 'Sierra Gorda';
   return 'Antofagasta';
 }
 
 function getFallback() {
   return [
-    {id:"t1",nombre:"Copec - Av. 11 de Septiembre",direccion:"Av. 11 de Septiembre 000",comuna:"Tocopilla",distribuidor:"Copec",lat:-22.0922,lng:-70.1979,precios:{"Gasolina 93":1238,"Gasolina 95":1273,"Diesel":1053}},
-    {id:"a1",nombre:"Copec - Av. Rendic",direccion:"Av. Antonio Rendic 3855",comuna:"Antofagasta",distribuidor:"Copec",lat:-23.6280,lng:-70.3920,precios:{"Gasolina 93":1236,"Gasolina 95":1271,"Gasolina 97":1301,"Diesel":1047}},
-    {id:"a2",nombre:"Shell - PAC",direccion:"Av. Pedro Aguirre Cerda 10615",comuna:"Antofagasta",distribuidor:"Shell",lat:-23.5780,lng:-70.3790,precios:{"Gasolina 93":1235,"Gasolina 95":1270,"Gasolina 97":1300,"Diesel":1046}},
-    {id:"c1",nombre:"Copec - Granaderos",direccion:"Granaderos 3524",comuna:"Calama",distribuidor:"Copec",lat:-22.4560,lng:-68.9293,precios:{"Gasolina 93":1247,"Gasolina 95":1280,"Gasolina 97":1309,"Diesel":1066}},
+    {id:"t1",nombre:"Copec - Av. 11 de Septiembre",direccion:"Av. 11 de Septiembre 000",comuna:"Tocopilla",distribuidor:"Copec",lat:-22.0922,lng:-70.1979,precios:{"Gasolina 93":1513,"Gasolina 95":1564,"Diesel":1100}},
+    {id:"a1",nombre:"Copec - Av. Rendic",direccion:"Av. Antonio Rendic 3855",comuna:"Antofagasta",distribuidor:"Copec",lat:-23.6280,lng:-70.3920,precios:{"Gasolina 93":1510,"Gasolina 95":1560,"Gasolina 97":1626,"Diesel":1095}},
+    {id:"a2",nombre:"Shell - PAC",direccion:"Av. Pedro Aguirre Cerda 10615",comuna:"Antofagasta",distribuidor:"Shell",lat:-23.5780,lng:-70.3790,precios:{"Gasolina 93":1515,"Gasolina 95":1565,"Gasolina 97":1630,"Diesel":1098}},
+    {id:"c1",nombre:"Copec - Granaderos",direccion:"Granaderos 3524",comuna:"Calama",distribuidor:"Copec",lat:-22.4560,lng:-68.9293,precios:{"Gasolina 93":1520,"Gasolina 95":1570,"Gasolina 97":1635,"Diesel":1105}},
   ];
 }
