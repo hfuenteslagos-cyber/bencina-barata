@@ -1,0 +1,16 @@
+[build]
+  publish = "static"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/estaciones"
+  to = "/.netlify/functions/estaciones"
+  status = 200
+
+[[redirects]]
+  from = "/api/refresh"
+  to = "/.netlify/functions/estaciones?refresh=1"
+  status = 200
