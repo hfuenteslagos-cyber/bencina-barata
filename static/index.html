@@ -387,8 +387,8 @@ async function fetchEstaciones() {
         const data = await res.json();
         allEstaciones = data.estaciones || [];
         const badge = document.getElementById('sourceBadge');
-        if (data.source === 'api_cne') { badge.textContent='Precios en vivo CNE'; badge.className='source-badge'; }
-        else { badge.textContent='Datos referencia'; badge.className='source-badge fallback'; }
+        if (data.source === 'fallback') { badge.textContent='Datos referencia'; badge.className='source-badge fallback'; }
+        else { badge.textContent='Precios reales ' + data.source; badge.className='source-badge'; }
         buildComunaChips();
         applyFilters();
         document.getElementById('loading').classList.add('hidden');

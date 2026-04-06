@@ -1,240 +1,319 @@
 #!/usr/bin/env python3
 """
 Bencina Barata - Servidor backend
-Proxy para API de CNE (bencinaenlinea.cl) + servidor estático
+Obtiene precios REALES desde preciobencina.cl + servidor estatico
 """
 
 import http.server
 import json
+import re
 import urllib.request
 import urllib.parse
 import urllib.error
 import os
 import time
-import threading
+import html as html_module
 
 PORT = int(os.environ.get("PORT", 8080))
-CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache_estaciones.json")
-CACHE_TTL = 3600  # 1 hora
+CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache_estaciones.json")
+CACHE_TTL = 3600  # 1 hora - los precios se actualizan semanalmente (jueves)
 
-# ── API CNE ──────────────────────────────────────────────────────────────────
+SCRAPE_URL = "https://preciobencina.cl/bencineras-en-region-de-antofagasta.php"
 
-CNE_API_URLS = [
-    "https://api.cne.cl/v3/combustibles/vehicular/estaciones?regionId=2&formatoJson=true",
-    "https://api.bencinaenlinea.cl/api/estaciones/region/2",
-]
+# ── Scraping preciobencina.cl ────────────────────────────────────────────────
 
-
-def fetch_estaciones_cne():
-    """Intenta obtener estaciones desde la API de CNE."""
+def fetch_precios_reales():
+    """Scrapea preciobencina.cl para obtener precios reales de la Region de Antofagasta."""
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; BencinaBarata/1.0)",
-        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "es-CL,es;q=0.9",
     }
-    for url in CNE_API_URLS:
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                if data:
-                    return data
-        except Exception as e:
-            print(f"  [WARN] API {url[:50]}... falló: {e}")
+
+    try:
+        req = urllib.request.Request(SCRAPE_URL, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            page_html = resp.read().decode("utf-8", errors="replace")
+
+        if "L.marker" not in page_html:
+            print("  [WARN] Pagina no contiene datos de marcadores")
+            return None
+
+        estaciones = parse_markers(page_html)
+        if estaciones:
+            print(f"  [OK] {len(estaciones)} estaciones scrapeadas de preciobencina.cl")
+            return estaciones
+
+    except Exception as e:
+        print(f"  [WARN] Error scrapeando preciobencina.cl: {e}")
+
     return None
 
 
-def normalize_estaciones(raw_data):
-    """Normaliza datos de diferentes fuentes al formato interno."""
+def parse_markers(page_html):
+    """Parsea los L.marker() del HTML de preciobencina.cl"""
     estaciones = []
-    items = raw_data if isinstance(raw_data, list) else raw_data.get("data", raw_data.get("estaciones", []))
 
-    for item in items:
+    # Patron para encontrar cada L.marker con su popup
+    # L.marker([lat, lng], {icon: ...}).addTo(map).bindPopup('...')
+    marker_pattern = re.compile(
+        r"L\.marker\(\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\].*?\.bindPopup\('(.*?)'\)",
+        re.DOTALL
+    )
+
+    for i, match in enumerate(marker_pattern.finditer(page_html)):
         try:
-            est = {
-                "id": item.get("id", item.get("id_estacion", "")),
-                "nombre": item.get("nombre", item.get("nombre_estacion", item.get("razon_social", ""))),
-                "direccion": item.get("direccion", item.get("direccion_calle", "")),
-                "comuna": item.get("comuna", item.get("nombre_comuna", "")),
-                "distribuidor": item.get("distribuidor", item.get("nombre_distribuidor", item.get("marca", ""))),
-                "lat": float(item.get("latitud", item.get("lat", 0))),
-                "lng": float(item.get("longitud", item.get("lng", item.get("lon", 0)))),
-                "precios": {},
-            }
+            lat = float(match.group(1))
+            lng = float(match.group(2))
+            popup_html = match.group(3)
 
-            # Extraer precios según el formato
-            if "precios" in item and isinstance(item["precios"], list):
-                for p in item["precios"]:
-                    tipo = p.get("tipo", p.get("nombre_combustible", ""))
-                    precio = p.get("precio", p.get("valor", 0))
-                    if tipo and precio:
-                        est["precios"][tipo.strip()] = int(float(precio))
+            # Decodificar escapes de JS
+            popup_html = popup_html.replace("\\'", "'").replace("\\n", "\n")
+
+            # Extraer marca/nombre
+            brand_match = re.search(r"<h3[^>]*>(.*?)</h3>", popup_html, re.DOTALL)
+            brand = clean_html(brand_match.group(1)) if brand_match else "Desconocida"
+
+            # Extraer direccion
+            addr_match = re.search(r"<h4[^>]*>.*?</i>\s*(.*?)</h4>", popup_html, re.DOTALL)
+            direccion = clean_html(addr_match.group(1)).strip() if addr_match else ""
+
+            # Extraer comuna de la direccion (despues de la ultima coma)
+            comuna = ""
+            if "," in direccion:
+                parts = direccion.rsplit(",", 1)
+                candidate = parts[-1].strip()
+                # Verificar que parece una comuna real (no un numero o parte de direccion)
+                known_comunas = ["Antofagasta", "Tocopilla", "Calama", "Mejillones",
+                                 "Taltal", "San Pedro de Atacama", "Sierra Gorda", "Maria Elena"]
+                if any(c.lower() in candidate.lower() for c in known_comunas):
+                    comuna = candidate
+                    direccion = parts[0].strip()
+                else:
+                    # La "comuna" detectada no es real, usar coordenadas
+                    comuna = guess_comuna(lat, lng)
             else:
-                # Formato plano con campos de precio directo
-                for key_map in [
-                    ("gasolina_93", "Gasolina 93"),
-                    ("gasolina_95", "Gasolina 95"),
-                    ("gasolina_97", "Gasolina 97"),
-                    ("petroleo_diesel", "Diesel"),
-                    ("kerosene", "Kerosene"),
-                    ("precio_gasolina_93", "Gasolina 93"),
-                    ("precio_gasolina_95", "Gasolina 95"),
-                    ("precio_gasolina_97", "Gasolina 97"),
-                    ("precio_petroleo_diesel", "Diesel"),
-                    ("precio_kerosene", "Kerosene"),
-                    ("glp_vehicular", "GLP"),
-                ]:
-                    val = item.get(key_map[0])
-                    if val and float(val) > 0:
-                        est["precios"][key_map[1]] = int(float(val))
+                comuna = guess_comuna(lat, lng)
 
-            # Solo incluir si tiene coordenadas válidas en la región
-            if est["lat"] != 0 and est["lng"] != 0 and est["precios"]:
-                estaciones.append(est)
+            # Extraer precios
+            precios = {}
+            # Bencina 93
+            p93 = re.search(r"(?:Bencina|Gasolina)\s*93.*?\$\s*([\d.,]+)", popup_html)
+            if p93:
+                precios["Gasolina 93"] = parse_price(p93.group(1))
+            # Bencina 95
+            p95 = re.search(r"(?:Bencina|Gasolina)\s*95.*?\$\s*([\d.,]+)", popup_html)
+            if p95:
+                precios["Gasolina 95"] = parse_price(p95.group(1))
+            # Bencina 97
+            p97 = re.search(r"(?:Bencina|Gasolina)\s*97.*?\$\s*([\d.,]+)", popup_html)
+            if p97:
+                precios["Gasolina 97"] = parse_price(p97.group(1))
+            # Diesel
+            pd = re.search(r"[Dd]iesel.*?\$\s*([\d.,]+)", popup_html)
+            if pd:
+                precios["Diesel"] = parse_price(pd.group(1))
+            # Kerosene
+            pk = re.search(r"[Kk]erosene.*?\$\s*([\d.,]+)", popup_html)
+            if pk:
+                precios["Kerosene"] = parse_price(pk.group(1))
 
-        except (ValueError, TypeError, KeyError) as e:
+            # Extraer ID de estacion
+            id_match = re.search(r"detalles-bencinera\.php\?i=(\w+)", popup_html)
+            station_id = id_match.group(1) if id_match else f"s{i+1}"
+
+            # Determinar distribuidor limpio
+            distribuidor = normalize_brand(brand)
+
+            if precios and lat != 0 and lng != 0:
+                estaciones.append({
+                    "id": station_id,
+                    "nombre": f"{distribuidor} - {direccion}" if direccion else distribuidor,
+                    "direccion": direccion,
+                    "comuna": comuna,
+                    "distribuidor": distribuidor,
+                    "lat": lat,
+                    "lng": lng,
+                    "precios": precios,
+                })
+
+        except Exception as e:
             continue
 
-    return estaciones
+    return estaciones if estaciones else None
 
+
+def clean_html(text):
+    """Limpia tags HTML y decodifica entidades."""
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html_module.unescape(text)
+    return text.strip()
+
+
+def parse_price(price_str):
+    """Convierte string de precio a int: '1.236' -> 1236, '1,236' -> 1236."""
+    cleaned = price_str.replace(".", "").replace(",", "").strip()
+    # Si el numero es muy chico (ej: 1236 sin punto), retornar directo
+    try:
+        val = int(cleaned)
+        return val if val > 100 else 0
+    except ValueError:
+        return 0
+
+
+def normalize_brand(raw_brand):
+    """Normaliza nombre de marca."""
+    b = raw_brand.upper().strip()
+    if "COPEC" in b:
+        return "Copec"
+    if "SHELL" in b:
+        return "Shell"
+    if "PETROBRAS" in b or "ENEX" in b:
+        return "Petrobras"
+    if "TERPEL" in b:
+        return "Terpel"
+    if "ARAUCO" in b:
+        return "Arauco"
+    if "AUTOGASCO" in b:
+        return "Autogasco"
+    return raw_brand.strip()
+
+
+def guess_comuna(lat, lng):
+    """Estima la comuna basado en coordenadas."""
+    # Rangos aproximados para comunas principales
+    if -22.15 < lat < -22.02 and -70.25 < lng < -70.15:
+        return "Tocopilla"
+    if -23.15 < lat < -23.05 and -70.50 < lng < -70.40:
+        return "Mejillones"
+    if -23.80 < lat < -23.55 and -70.45 < lng < -70.30:
+        return "Antofagasta"
+    if -22.50 < lat < -22.40 and -69.00 < lng < -68.85:
+        return "Calama"
+    if -25.45 < lat < -25.35 and -70.55 < lng < -70.40:
+        return "Taltal"
+    if -22.95 < lat < -22.85 and -68.25 < lng < -68.15:
+        return "San Pedro de Atacama"
+    if -22.95 < lat < -22.85 and -69.40 < lng < -69.25:
+        return "Sierra Gorda"
+    if -22.40 < lat < -22.30 and -69.75 < lng < -69.60:
+        return "Maria Elena"
+    return "Antofagasta"
+
+
+# ── Fallback data ────────────────────────────────────────────────────────────
 
 def get_fallback_data():
-    """Datos de respaldo con estaciones REALES verificadas de la Region de Antofagasta.
-    Fuentes: preciobencina.cl, bencinachile.cl, bencinaenlinea.cl (CNE).
-    Precios son referenciales - los reales se obtienen con token de api.cne.cl
+    """Datos verificados como respaldo si el scraping falla.
+    Fuentes: preciobencina.cl, bencinaenlinea.cl (CNE).
+    IMPORTANTE: precios son referenciales, los reales vienen del scraping.
     """
     return [
-        # ── TOCOPILLA (3 estaciones reales) ──
+        # TOCOPILLA (3 reales: 2 Copec + 1 Shell)
         {"id": "t1", "nombre": "Copec - Av. 11 de Septiembre", "direccion": "Av. 11 de Septiembre 000", "comuna": "Tocopilla", "distribuidor": "Copec", "lat": -22.0922, "lng": -70.1979, "precios": {"Gasolina 93": 1289, "Gasolina 95": 1359, "Gasolina 97": 1429, "Diesel": 1049}},
         {"id": "t2", "nombre": "Copec - Tte. Merino", "direccion": "Avda. Teniente Merino 3303", "comuna": "Tocopilla", "distribuidor": "Copec", "lat": -22.0850, "lng": -70.1935, "precios": {"Gasolina 93": 1289, "Gasolina 95": 1359, "Gasolina 97": 1429, "Diesel": 1049}},
-        {"id": "t3", "nombre": "Shell - Costanera Tocopilla", "direccion": "Avda. Costanera s/n", "comuna": "Tocopilla", "distribuidor": "Shell", "lat": -22.0940, "lng": -70.1995, "precios": {"Gasolina 93": 1299, "Gasolina 95": 1369, "Gasolina 97": 1439, "Diesel": 1059}},
-
-        # ── MEJILLONES (2 estaciones reales) ──
+        {"id": "t3", "nombre": "Shell - Costanera", "direccion": "Avda. Costanera s/n", "comuna": "Tocopilla", "distribuidor": "Shell", "lat": -22.0940, "lng": -70.1995, "precios": {"Gasolina 93": 1299, "Gasolina 95": 1369, "Gasolina 97": 1439, "Diesel": 1059}},
+        # MEJILLONES (2 reales: Copec)
         {"id": "m1", "nombre": "Copec - San Martin", "direccion": "San Martin 525", "comuna": "Mejillones", "distribuidor": "Copec", "lat": -23.0983, "lng": -70.4517, "precios": {"Gasolina 93": 1285, "Gasolina 95": 1355, "Gasolina 97": 1425, "Diesel": 1045}},
-        {"id": "m2", "nombre": "Copec - Av. Fertilizantes", "direccion": "Av. Fertilizantes esq. Ignacio Riquelme", "comuna": "Mejillones", "distribuidor": "Copec", "lat": -23.1010, "lng": -70.4480, "precios": {"Gasolina 93": 1285, "Gasolina 95": 1355, "Diesel": 1045}},
-
-        # ── ANTOFAGASTA - COPEC (12 estaciones reales) ──
-        {"id": "a1", "nombre": "Copec - Av. Rendic", "direccion": "Av. Antonio Rendic 3855", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6280, "lng": -70.3920, "precios": {"Gasolina 93": 1269, "Gasolina 95": 1339, "Gasolina 97": 1409, "Diesel": 1029}},
-        {"id": "a2", "nombre": "Copec - Av. Mejillones", "direccion": "Av. Mejillones 4950 esq. Illapel", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6190, "lng": -70.3870, "precios": {"Gasolina 93": 1269, "Gasolina 95": 1339, "Gasolina 97": 1409, "Diesel": 1029}},
-        {"id": "a3", "nombre": "Copec - San Martin/Uribe", "direccion": "San Martin esq. Uribe", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6500, "lng": -70.3980, "precios": {"Gasolina 93": 1265, "Gasolina 95": 1335, "Gasolina 97": 1405, "Diesel": 1025}},
-        {"id": "a4", "nombre": "Copec - Av. Angamos", "direccion": "Av. Angamos 0633", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6520, "lng": -70.3960, "precios": {"Gasolina 93": 1269, "Gasolina 95": 1339, "Gasolina 97": 1409, "Diesel": 1029}},
-        {"id": "a5", "nombre": "Copec - Ruta 5 Norte Km 1351", "direccion": "Ruta 5 Norte Km 1351", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.5500, "lng": -70.3600, "precios": {"Gasolina 93": 1275, "Gasolina 95": 1345, "Diesel": 1035}},
-        {"id": "a6", "nombre": "Copec - Pedro Aguirre Cerda/Rendic", "direccion": "Av. Pedro Aguirre Cerda / A. Rendic", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6100, "lng": -70.3890, "precios": {"Gasolina 93": 1269, "Gasolina 95": 1339, "Gasolina 97": 1409, "Diesel": 1029}},
-        {"id": "a7", "nombre": "Copec - Av. Argentina", "direccion": "Av. Argentina 3211", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6380, "lng": -70.3940, "precios": {"Gasolina 93": 1265, "Gasolina 95": 1335, "Gasolina 97": 1405, "Diesel": 1025}},
-        {"id": "a8", "nombre": "Copec - Perez Zujovic", "direccion": "Av. Edmundo Perez Zujovic 4256", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6750, "lng": -70.4050, "precios": {"Gasolina 93": 1265, "Gasolina 95": 1335, "Gasolina 97": 1405, "Diesel": 1025}},
-        {"id": "a9", "nombre": "Copec - Rep. de Croacia", "direccion": "Av. Rep. de Croacia 286", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.5850, "lng": -70.3830, "precios": {"Gasolina 93": 1269, "Gasolina 95": 1339, "Gasolina 97": 1409, "Diesel": 1029}},
-        {"id": "a10", "nombre": "Copec - PAC 10980", "direccion": "Av. Pedro Aguirre Cerda 10980", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.5750, "lng": -70.3780, "precios": {"Gasolina 93": 1275, "Gasolina 95": 1345, "Diesel": 1035}},
-        {"id": "a11", "nombre": "Copec - Perez Zujovic Sur", "direccion": "Av. Perez Zujovic 10675", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.7100, "lng": -70.4150, "precios": {"Gasolina 93": 1265, "Gasolina 95": 1335, "Gasolina 97": 1405, "Diesel": 1025}},
-        {"id": "a12", "nombre": "Copec - Ruta 5 Km 1398", "direccion": "Ruta 5 Norte Km 1398", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.7600, "lng": -70.3400, "precios": {"Gasolina 93": 1275, "Gasolina 95": 1345, "Diesel": 1035}},
-
-        # ── ANTOFAGASTA - PETROBRAS (7 estaciones reales) ──
-        {"id": "a13", "nombre": "Petrobras - Avda. Grecia", "direccion": "Avda. Grecia 430", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6350, "lng": -70.3935, "precios": {"Gasolina 93": 1259, "Gasolina 95": 1329, "Gasolina 97": 1399, "Diesel": 1019}},
-        {"id": "a14", "nombre": "Petrobras - Av. Argentina", "direccion": "Av. Argentina 2802", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6400, "lng": -70.3950, "precios": {"Gasolina 93": 1259, "Gasolina 95": 1329, "Diesel": 1019}},
-        {"id": "a15", "nombre": "Petrobras - Huamachuco", "direccion": "Juan Bolivar Huamachuco 907", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6450, "lng": -70.3965, "precios": {"Gasolina 93": 1255, "Gasolina 95": 1325, "Diesel": 1015}},
-        {"id": "a16", "nombre": "Petrobras - Rendic 6850", "direccion": "Av. Antonio Rendic 6850", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6150, "lng": -70.3860, "precios": {"Gasolina 93": 1259, "Gasolina 95": 1329, "Diesel": 1019}},
-        {"id": "a17", "nombre": "Petrobras - Perez Zujovic 5030", "direccion": "Av. Perez Zujovic 5030", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6800, "lng": -70.4080, "precios": {"Gasolina 93": 1255, "Gasolina 95": 1325, "Gasolina 97": 1395, "Diesel": 1015}},
-        {"id": "a18", "nombre": "Petrobras - PAC 11315", "direccion": "Pedro Aguirre Cerda 11315", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.5700, "lng": -70.3760, "precios": {"Gasolina 93": 1259, "Gasolina 95": 1329, "Diesel": 1019}},
-        {"id": "a19", "nombre": "Petrobras - PAC 10850", "direccion": "Avda. Pedro Aguirre Cerda 10850", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.5730, "lng": -70.3770, "precios": {"Gasolina 93": 1259, "Gasolina 95": 1329, "Diesel": 1019}},
-
-        # ── ANTOFAGASTA - SHELL (5 estaciones reales) ──
-        {"id": "a20", "nombre": "Shell - Rendic 4561", "direccion": "Antonio Rendic 4561", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.6240, "lng": -70.3910, "precios": {"Gasolina 93": 1279, "Gasolina 95": 1349, "Gasolina 97": 1419, "Diesel": 1039}},
-        {"id": "a21", "nombre": "Shell - 21 de Mayo/Argentina", "direccion": "Avda. 21 de Mayo / Argentina 1119", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.6480, "lng": -70.3970, "precios": {"Gasolina 93": 1279, "Gasolina 95": 1349, "Gasolina 97": 1419, "Diesel": 1039}},
-        {"id": "a22", "nombre": "Shell - Argentina/Diaz Gana", "direccion": "Avda. Argentina / Diaz Gana 1105", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.6420, "lng": -70.3945, "precios": {"Gasolina 93": 1279, "Gasolina 95": 1349, "Gasolina 97": 1419, "Diesel": 1039}},
-        {"id": "a23", "nombre": "Shell - Panamericana Km 1354", "direccion": "Panamericana Norte Km 1354", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.5600, "lng": -70.3650, "precios": {"Gasolina 93": 1285, "Gasolina 95": 1355, "Diesel": 1045}},
-        {"id": "a24", "nombre": "Shell - PAC 8450", "direccion": "Pedro Aguirre Cerda 8450", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.5900, "lng": -70.3820, "precios": {"Gasolina 93": 1279, "Gasolina 95": 1349, "Gasolina 97": 1419, "Diesel": 1039}},
-
-        # ── CALAMA - COPEC (5 estaciones reales) ──
-        {"id": "c1", "nombre": "Copec - Granaderos", "direccion": "Granaderos 3524", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4560, "lng": -68.9293, "precios": {"Gasolina 93": 1309, "Gasolina 95": 1379, "Gasolina 97": 1449, "Diesel": 1069}},
-        {"id": "c2", "nombre": "Copec - Abaroa", "direccion": "Abaroa 1413", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4580, "lng": -68.9260, "precios": {"Gasolina 93": 1309, "Gasolina 95": 1379, "Gasolina 97": 1449, "Diesel": 1069}},
-        {"id": "c3", "nombre": "Copec - Diego de Almagro", "direccion": "Diego de Almagro 2547", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4530, "lng": -68.9310, "precios": {"Gasolina 93": 1305, "Gasolina 95": 1375, "Gasolina 97": 1445, "Diesel": 1065}},
-        {"id": "c4", "nombre": "Copec - Punta de Diamante", "direccion": "Punta de Diamante S/N, Salida Sur", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4700, "lng": -68.9350, "precios": {"Gasolina 93": 1309, "Gasolina 95": 1379, "Diesel": 1069}},
-        {"id": "c5", "nombre": "Copec - Balmaceda 3012", "direccion": "Av. Balmaceda 3012", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4540, "lng": -68.9280, "precios": {"Gasolina 93": 1305, "Gasolina 95": 1375, "Gasolina 97": 1445, "Diesel": 1065}},
-
-        # ── CALAMA - PETROBRAS (3 estaciones reales) ──
-        {"id": "c6", "nombre": "Petrobras - Chorrillos/Latorre", "direccion": "Av. Chorrillos / Latorre 2687", "comuna": "Calama", "distribuidor": "Petrobras", "lat": -22.4550, "lng": -68.9240, "precios": {"Gasolina 93": 1299, "Gasolina 95": 1369, "Gasolina 97": 1439, "Diesel": 1059}},
-        {"id": "c7", "nombre": "Petrobras - Balmaceda 4450", "direccion": "Balmaceda 4450", "comuna": "Calama", "distribuidor": "Petrobras", "lat": -22.4500, "lng": -68.9200, "precios": {"Gasolina 93": 1299, "Gasolina 95": 1369, "Diesel": 1059}},
-        {"id": "c8", "nombre": "Petrobras - Miguel Grau", "direccion": "Av. Miguel Grau 1064", "comuna": "Calama", "distribuidor": "Petrobras", "lat": -22.4590, "lng": -68.9270, "precios": {"Gasolina 93": 1295, "Gasolina 95": 1365, "Diesel": 1055}},
-
-        # ── CALAMA - SHELL (2 estaciones reales) ──
-        {"id": "c9", "nombre": "Shell - Balmaceda 4539", "direccion": "Balmaceda 4539", "comuna": "Calama", "distribuidor": "Shell", "lat": -22.4490, "lng": -68.9190, "precios": {"Gasolina 93": 1315, "Gasolina 95": 1385, "Gasolina 97": 1455, "Diesel": 1075}},
-        {"id": "c10", "nombre": "Shell - O'Higgins", "direccion": "Avda. O'Higgins 234", "comuna": "Calama", "distribuidor": "Shell", "lat": -22.4570, "lng": -68.9250, "precios": {"Gasolina 93": 1319, "Gasolina 95": 1389, "Gasolina 97": 1459, "Diesel": 1079}},
-
-        # ── TALTAL (3 estaciones reales) ──
-        {"id": "tt1", "nombre": "Copec - Francisco Bilbao", "direccion": "Francisco Bilbao 101", "comuna": "Taltal", "distribuidor": "Copec", "lat": -25.4053, "lng": -70.4828, "precios": {"Gasolina 93": 1310, "Gasolina 95": 1380, "Gasolina 97": 1450, "Diesel": 1070}},
-        {"id": "tt2", "nombre": "Copec - Panamericana Km 1144", "direccion": "Panamericana Norte Km 1144", "comuna": "Taltal", "distribuidor": "Copec", "lat": -25.3800, "lng": -70.4500, "precios": {"Gasolina 93": 1315, "Gasolina 95": 1385, "Diesel": 1075}},
-        {"id": "tt3", "nombre": "Petrobras - Bilbao 986", "direccion": "Francisco Bilbao 986", "comuna": "Taltal", "distribuidor": "Petrobras", "lat": -25.4060, "lng": -70.4835, "precios": {"Gasolina 93": 1305, "Gasolina 95": 1375, "Diesel": 1065}},
-
-        # ── SIERRA GORDA (1 estacion real) ──
+        {"id": "m2", "nombre": "Copec - Av. Fertilizantes", "direccion": "Av. Fertilizantes esq. Riquelme", "comuna": "Mejillones", "distribuidor": "Copec", "lat": -23.1010, "lng": -70.4480, "precios": {"Gasolina 93": 1285, "Gasolina 95": 1355, "Diesel": 1045}},
+        # ANTOFAGASTA (muestra de principales)
+        {"id": "a1", "nombre": "Copec - Av. Rendic", "direccion": "Av. Antonio Rendic 3855", "comuna": "Antofagasta", "distribuidor": "Copec", "lat": -23.6280, "lng": -70.3920, "precios": {"Gasolina 93": 1236, "Gasolina 95": 1271, "Gasolina 97": 1301, "Diesel": 1047}},
+        {"id": "a2", "nombre": "Shell - PAC 10615", "direccion": "Av. Pedro Aguirre Cerda 10615", "comuna": "Antofagasta", "distribuidor": "Shell", "lat": -23.5780, "lng": -70.3790, "precios": {"Gasolina 93": 1235, "Gasolina 95": 1270, "Gasolina 97": 1300, "Diesel": 1046}},
+        {"id": "a3", "nombre": "Petrobras - Av. Grecia", "direccion": "Avda. Grecia 430", "comuna": "Antofagasta", "distribuidor": "Petrobras", "lat": -23.6350, "lng": -70.3935, "precios": {"Gasolina 93": 1230, "Gasolina 95": 1265, "Gasolina 97": 1295, "Diesel": 1040}},
+        # CALAMA
+        {"id": "c1", "nombre": "Copec - Granaderos", "direccion": "Granaderos 3524", "comuna": "Calama", "distribuidor": "Copec", "lat": -22.4560, "lng": -68.9293, "precios": {"Gasolina 93": 1247, "Gasolina 95": 1280, "Gasolina 97": 1309, "Diesel": 1066}},
+        {"id": "c2", "nombre": "Shell - Balmaceda", "direccion": "Balmaceda 4539", "comuna": "Calama", "distribuidor": "Shell", "lat": -22.4490, "lng": -68.9190, "precios": {"Gasolina 93": 1248, "Gasolina 95": 1281, "Gasolina 97": 1310, "Diesel": 1066}},
+        # TALTAL
+        {"id": "tt1", "nombre": "Copec - Francisco Bilbao", "direccion": "Francisco Bilbao 101", "comuna": "Taltal", "distribuidor": "Copec", "lat": -25.4053, "lng": -70.4828, "precios": {"Gasolina 93": 1261, "Gasolina 95": 1292, "Gasolina 97": 1325, "Diesel": 1065}},
+        # SIERRA GORDA
         {"id": "sg1", "nombre": "Copec - Carmen Alto", "direccion": "Carmen Alto 1458", "comuna": "Sierra Gorda", "distribuidor": "Copec", "lat": -22.8933, "lng": -69.3236, "precios": {"Gasolina 93": 1335, "Gasolina 95": 1405, "Gasolina 97": 1475, "Diesel": 1095}},
-
-        # ── SAN PEDRO DE ATACAMA (1 estacion real) ──
+        # SAN PEDRO DE ATACAMA
         {"id": "sp1", "nombre": "Copec - Ruta 27", "direccion": "Ruta 27 Interseccion B241", "comuna": "San Pedro de Atacama", "distribuidor": "Copec", "lat": -22.9087, "lng": -68.1997, "precios": {"Gasolina 93": 1349, "Gasolina 95": 1419, "Gasolina 97": 1489, "Diesel": 1109}},
     ]
 
 
-def load_estaciones():
-    """Carga estaciones: primero cache, luego API, luego fallback."""
-    # Intentar cache
-    if os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r") as f:
-                cached = json.load(f)
-            if time.time() - cached.get("timestamp", 0) < CACHE_TTL:
-                print(f"  [OK] {len(cached['estaciones'])} estaciones desde cache")
-                return cached["estaciones"], cached.get("source", "cache")
-        except Exception:
-            pass
-
-    # Intentar API
-    print("  [INFO] Consultando API CNE...")
-    raw = fetch_estaciones_cne()
-    if raw:
-        estaciones = normalize_estaciones(raw)
-        if estaciones:
-            save_cache(estaciones, "api_cne")
-            print(f"  [OK] {len(estaciones)} estaciones desde API CNE")
-            return estaciones, "api_cne"
-
-    # Fallback
-    estaciones = get_fallback_data()
-    save_cache(estaciones, "fallback")
-    print(f"  [OK] {len(estaciones)} estaciones (datos de referencia)")
-    return estaciones, "fallback"
-
+# ── Cache y carga ────────────────────────────────────────────────────────────
 
 def save_cache(estaciones, source):
     try:
         with open(CACHE_FILE, "w") as f:
-            json.dump({"timestamp": time.time(), "source": source, "estaciones": estaciones}, f)
-    except Exception:
-        pass
+            json.dump({
+                "timestamp": time.time(),
+                "source": source,
+                "estaciones": estaciones,
+            }, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"  [WARN] No se pudo guardar cache: {e}")
+
+
+def load_estaciones():
+    """Carga estaciones: cache valido → scraping real → fallback."""
+    # 1. Intentar cache
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r") as f:
+                cached = json.load(f)
+            age = time.time() - cached.get("timestamp", 0)
+            if age < CACHE_TTL:
+                src = cached.get("source", "cache")
+                est = cached["estaciones"]
+                mins = int((CACHE_TTL - age) / 60)
+                print(f"  [OK] {len(est)} estaciones desde cache ({src}, expira en {mins}min)")
+                return est, src
+        except Exception:
+            pass
+
+    # 2. Scraping real de preciobencina.cl
+    print("  [INFO] Scrapeando precios reales de preciobencina.cl...")
+    estaciones = fetch_precios_reales()
+    if estaciones and len(estaciones) >= 5:
+        save_cache(estaciones, "preciobencina.cl")
+        return estaciones, "preciobencina.cl"
+
+    # 3. Fallback
+    print("  [WARN] Usando datos de respaldo")
+    estaciones = get_fallback_data()
+    save_cache(estaciones, "fallback")
+    return estaciones, "fallback"
 
 
 # ── Servidor HTTP ────────────────────────────────────────────────────────────
 
 ESTACIONES = []
 DATA_SOURCE = "loading"
+LAST_UPDATE = 0
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=os.path.join(os.path.dirname(__file__), "static"), **kwargs)
+        super().__init__(*args, directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "static"), **kwargs)
 
     def do_GET(self):
-        global ESTACIONES, DATA_SOURCE
+        global ESTACIONES, DATA_SOURCE, LAST_UPDATE
         parsed = urllib.parse.urlparse(self.path)
 
         if parsed.path == "/api/estaciones":
-            self.send_json({"estaciones": ESTACIONES, "source": DATA_SOURCE, "count": len(ESTACIONES)})
+            self.send_json({
+                "estaciones": ESTACIONES,
+                "source": DATA_SOURCE,
+                "count": len(ESTACIONES),
+                "updated": LAST_UPDATE,
+                "next_update": LAST_UPDATE + CACHE_TTL,
+            })
 
         elif parsed.path == "/api/refresh":
-            # Borrar cache para forzar refresh
             if os.path.exists(CACHE_FILE):
                 os.remove(CACHE_FILE)
             ESTACIONES, DATA_SOURCE = load_estaciones()
-            self.send_json({"estaciones": ESTACIONES, "source": DATA_SOURCE, "count": len(ESTACIONES)})
+            LAST_UPDATE = time.time()
+            self.send_json({
+                "estaciones": ESTACIONES,
+                "source": DATA_SOURCE,
+                "count": len(ESTACIONES),
+                "updated": LAST_UPDATE,
+            })
 
         else:
-            # Servir archivos estáticos
             if parsed.path == "/":
                 self.path = "/index.html"
             super().do_GET()
@@ -254,13 +333,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
-    global ESTACIONES, DATA_SOURCE
-    print("\n⛽ Bencina Barata - Región de Antofagasta")
+    global ESTACIONES, DATA_SOURCE, LAST_UPDATE
+    print("\n⛽ Bencina Barata - Region de Antofagasta")
     print("=" * 45)
     ESTACIONES, DATA_SOURCE = load_estaciones()
+    LAST_UPDATE = time.time()
     print(f"\n🌐 Servidor: http://localhost:{PORT}")
-    print(f"   Fuente datos: {DATA_SOURCE}")
+    print(f"   Fuente: {DATA_SOURCE}")
     print(f"   Estaciones: {len(ESTACIONES)}")
+    print(f"   Cache TTL: {CACHE_TTL//60} min")
     print(f"\n   Abre http://localhost:{PORT} en tu navegador\n")
 
     server = http.server.HTTPServer(("", PORT), RequestHandler)
