@@ -3,274 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bencina Barata - Region de Antofagasta</title>
-    <meta name="description" content="Encuentra el combustible mas barato en la Region de Antofagasta. Compara precios y calcula tu ruta.">
+    <title>Bencina Barata - Antofagasta</title>
+    <meta name="description" content="Precios de bencina en la Region de Antofagasta. Datos oficiales CNE.">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Bencina Barata">
-    <meta name="theme-color" content="#10b981">
+    <meta name="theme-color" content="#ffffff">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192.png">
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #10b981;
-            --primary-dark: #059669;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --bg: #0f172a;
-            --bg-card: #1e293b;
-            --bg-card-hover: #334155;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #334155;
-            --radius: 12px;
-            --ig-gradient: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
-        }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; }
+        body { font-family:'Inter',sans-serif; background:#f8f9fa; color:#1a1a1a; height:100dvh; overflow:hidden; }
 
-        /* Layout */
-        .app { display:flex; height:100vh; height:100dvh; }
-        .sidebar { width:420px; min-width:420px; display:flex; flex-direction:column; background:var(--bg); border-right:1px solid var(--border); z-index:1000; overflow:hidden; }
-        .map-container { flex:1; position:relative; }
+        .app { display:flex; height:100dvh; }
+        .sidebar { width:400px; min-width:400px; display:flex; flex-direction:column; background:#fff; border-right:1px solid #e5e7eb; z-index:1000; }
+        .map-area { flex:1; position:relative; }
         #map { height:100%; width:100%; }
 
         /* Header */
-        .header { padding:14px 20px; border-bottom:1px solid var(--border); background:linear-gradient(135deg,var(--bg) 0%,#1a2332 100%); }
-        .header h1 { font-size:20px; font-weight:800; display:flex; align-items:center; gap:8px; }
-        .header h1 span { color:var(--primary); }
-        .header-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
-        .source-badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:20px; background:var(--primary); color:white; font-weight:600; margin-left:6px; }
-        .source-badge.fallback { background:var(--warning); }
-
-        /* Instagram Banner */
-        .ig-banner { display:flex; align-items:center; gap:10px; padding:10px 20px; background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%); border-bottom:1px solid var(--border); cursor:pointer; text-decoration:none; color:var(--text); transition:all .2s; }
-        .ig-banner:hover { background:#1e2a45; }
-        .ig-avatar { width:36px; height:36px; border-radius:50%; background:var(--ig-gradient); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-        .ig-info { flex:1; min-width:0; }
-        .ig-name { font-size:13px; font-weight:700; }
-        .ig-handle { font-size:11px; color:var(--text-muted); }
-        .ig-btn { padding:6px 14px; border-radius:8px; background:var(--ig-gradient); color:white; font-size:11px; font-weight:700; border:none; cursor:pointer; white-space:nowrap; font-family:inherit; }
-        .ig-btn:hover { opacity:.9; }
+        .header { padding:16px 20px 12px; border-bottom:1px solid #e5e7eb; }
+        .header h1 { font-size:18px; font-weight:700; color:#111; }
+        .header h1 span { color:#059669; }
+        .header-meta { font-size:11px; color:#6b7280; margin-top:2px; }
+        .badge { font-size:10px; padding:2px 6px; border-radius:4px; background:#dcfce7; color:#166534; font-weight:600; }
 
         /* Controls */
-        .controls { padding:10px 20px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+        .controls { padding:12px 20px; border-bottom:1px solid #e5e7eb; display:flex; flex-direction:column; gap:8px; }
         .control-row { display:flex; gap:8px; align-items:center; }
-        .control-row label { font-size:12px; font-weight:600; color:var(--text-muted); min-width:75px; }
-        select, input[type="number"] { flex:1; background:var(--bg-card); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
-        select:focus, input:focus { border-color:var(--primary); }
+        .control-row label { font-size:12px; font-weight:500; color:#6b7280; min-width:70px; }
+        select { flex:1; background:#f9fafb; border:1px solid #d1d5db; color:#111; padding:8px 10px; border-radius:8px; font-size:13px; font-family:inherit; }
+        select:focus { outline:none; border-color:#059669; }
 
-        .btn { padding:8px 16px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; font-family:inherit; display:flex; align-items:center; gap:6px; }
-        .btn-location { background:#3b82f6; color:white; width:100%; justify-content:center; padding:10px; }
-        .btn-location:hover { background:#2563eb; }
+        .btn-location { width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; background:#f9fafb; color:#374151; font-size:13px; font-weight:500; cursor:pointer; font-family:inherit; }
+        .btn-location:hover { background:#f3f4f6; }
+        .btn-location.active { background:#dcfce7; border-color:#86efac; color:#166534; }
 
-        /* Filter chips */
-        .filter-chips { display:flex; gap:5px; flex-wrap:wrap; }
-        .chip { font-size:11px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; font-weight:500; transition:all .2s; }
-        .chip.active { background:var(--primary); color:white; border-color:var(--primary); }
-        .chip:hover:not(.active) { border-color:var(--primary); color:var(--primary); }
+        /* Chips */
+        .chips { display:flex; gap:4px; flex-wrap:wrap; }
+        .chip { font-size:11px; padding:4px 10px; border-radius:16px; border:1px solid #d1d5db; background:#fff; color:#6b7280; cursor:pointer; font-family:inherit; }
+        .chip.active { background:#059669; color:#fff; border-color:#059669; }
 
-        /* Search */
-        .search-box { position:relative; }
-        .search-box input { width:100%; background:var(--bg-card); border:1px solid var(--border); color:var(--text); padding:8px 12px 8px 32px; border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
-        .search-box input:focus { border-color:var(--primary); }
-        .search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:14px; }
+        /* List */
+        .list-header { padding:8px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e5e7eb; }
+        .list-header h3 { font-size:13px; font-weight:600; color:#374151; }
+        .count { font-size:11px; color:#9ca3af; }
+        .sort-btn { font-size:11px; color:#059669; cursor:pointer; background:none; border:none; font-family:inherit; font-weight:600; }
+        .list { flex:1; overflow-y:auto; padding:8px 12px; }
 
-        /* Route panel */
-        .route-panel { display:none; padding:10px 20px; background:linear-gradient(135deg,#1a2332 0%,var(--bg) 100%); border-bottom:1px solid var(--border); position:relative; }
-        .route-panel.active { display:block; }
-        .route-panel h4 { font-size:13px; font-weight:700; margin-bottom:6px; }
-        .route-summary { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-        .route-stat { text-align:center; padding:6px; background:rgba(255,255,255,.04); border-radius:8px; }
-        .route-stat .stat-value { font-size:16px; font-weight:800; color:var(--primary); }
-        .route-stat .stat-label { font-size:10px; color:var(--text-muted); }
-        .route-stat.cost .stat-value { color:var(--warning); }
-        .route-close { position:absolute; top:8px; right:12px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; }
+        /* Cards */
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin-bottom:6px; cursor:pointer; transition:all .15s; }
+        .card:hover { border-color:#d1d5db; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+        .card.active { border-color:#059669; background:#f0fdf4; }
+        .card.cheapest { border-color:#86efac; background:#f0fdf4; }
+        .card-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+        .card-name { font-size:13px; font-weight:600; color:#111; }
+        .card-brand { font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; text-transform:uppercase; }
+        .b-copec { background:#fee2e2; color:#991b1b; }
+        .b-shell { background:#fef9c3; color:#854d0e; }
+        .b-petrobras { background:#dcfce7; color:#166534; }
+        .b-terpel { background:#ffedd5; color:#9a3412; }
+        .b-default { background:#f3f4f6; color:#374151; }
+        .card-addr { font-size:11px; color:#9ca3af; margin-bottom:6px; }
+        .card-prices { display:flex; gap:6px; flex-wrap:wrap; }
+        .ptag { font-size:11px; padding:3px 8px; border-radius:6px; background:#f3f4f6; }
+        .ptag .type { color:#6b7280; }
+        .ptag .val { font-weight:700; color:#111; }
+        .ptag.sel { background:#dcfce7; }
+        .ptag.sel .val { color:#059669; }
+        .cheapest-label { font-size:9px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:.5px; }
 
-        /* Station list */
-        .station-list-header { padding:8px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
-        .station-list-header h3 { font-size:13px; font-weight:600; }
-        .station-count { font-size:11px; color:var(--text-muted); }
-        .sort-toggle { font-size:11px; color:var(--primary); cursor:pointer; background:none; border:none; font-family:inherit; font-weight:600; }
-        .station-list { flex:1; overflow-y:auto; padding:8px; -webkit-overflow-scrolling:touch; }
-        .station-list::-webkit-scrollbar { width:6px; }
-        .station-list::-webkit-scrollbar-track { background:transparent; }
-        .station-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+        .card-dist { margin-top:6px; padding-top:6px; border-top:1px solid #f3f4f6; font-size:11px; color:#6b7280; display:flex; gap:12px; }
+        .card-dist strong { color:#111; }
 
-        .station-card { background:var(--bg-card); border-radius:var(--radius); padding:12px; margin-bottom:6px; cursor:pointer; transition:all .2s; border:1px solid transparent; position:relative; }
-        .station-card:hover { background:var(--bg-card-hover); border-color:var(--border); }
-        .station-card.active { border-color:var(--primary); background:rgba(16,185,129,.08); }
-        .station-card.cheapest::before { content:"MAS BARATA"; position:absolute; top:-1px; right:12px; background:var(--primary); color:white; font-size:9px; font-weight:700; padding:2px 8px; border-radius:0 0 6px 6px; letter-spacing:.5px; }
-        .station-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px; }
-        .station-name { font-size:13px; font-weight:700; line-height:1.3; }
-        .station-brand { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
-        .brand-copec { background:#dc2626; color:white; }
-        .brand-shell { background:#facc15; color:#1a1a1a; }
-        .brand-enex { background:#22c55e; color:white; }
-        .brand-terpel { background:#f97316; color:white; }
-        .brand-arauco { background:#8b5cf6; color:white; }
-        .brand-default { background:#64748b; color:white; }
-        .station-address { font-size:11px; color:var(--text-muted); margin-bottom:6px; }
-        .station-prices { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:6px; }
-        .price-tag { font-size:11px; padding:2px 7px; border-radius:6px; background:rgba(255,255,255,.06); display:flex; align-items:center; gap:3px; }
-        .price-tag .fuel-type { color:var(--text-muted); font-weight:500; }
-        .price-tag .fuel-price { font-weight:700; color:var(--primary); }
-        .price-tag.selected-fuel { background:rgba(16,185,129,.15); border:1px solid rgba(16,185,129,.3); }
-        .station-route-info { display:flex; gap:10px; padding-top:6px; border-top:1px solid var(--border); font-size:12px; }
-        .route-item { display:flex; align-items:center; gap:3px; }
-        .route-item .icon { font-size:13px; }
-        .route-item .value { font-weight:700; }
-        .route-item .unit { color:var(--text-muted); }
-        .route-cost { margin-left:auto; color:var(--warning); font-weight:700; }
+        /* Footer */
+        .footer { padding:8px 20px; border-top:1px solid #e5e7eb; font-size:10px; color:#9ca3af; text-align:center; }
+        .footer a { color:#059669; text-decoration:none; }
 
-        /* Map overlay */
-        .map-overlay { position:absolute; top:16px; right:16px; z-index:1000; display:flex; flex-direction:column; gap:8px; }
-        .map-btn { background:var(--bg-card); border:1px solid var(--border); color:var(--text); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-        .map-btn:hover { background:var(--bg-card-hover); }
+        /* Map buttons */
+        .map-btns { position:absolute; top:12px; right:12px; z-index:1000; display:flex; flex-direction:column; gap:6px; }
+        .map-btn { background:#fff; border:1px solid #d1d5db; width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+        .map-btn:hover { background:#f9fafb; }
 
-        /* Data source footer */
-        .data-footer { padding:8px 20px; border-top:1px solid var(--border); font-size:10px; color:var(--text-muted); text-align:center; background:var(--bg); }
-        .data-footer a { color:var(--primary); text-decoration:none; }
+        /* Leaflet popups */
+        .leaflet-popup-content-wrapper { border-radius:10px!important; box-shadow:0 2px 10px rgba(0,0,0,.12)!important; }
+        .leaflet-popup-content { margin:10px 14px!important; font-family:'Inter',sans-serif!important; font-size:13px!important; }
+        .pop-name { font-weight:700; margin-bottom:2px; }
+        .pop-addr { color:#6b7280; font-size:11px; margin-bottom:6px; }
+        .pop-price { font-size:20px; font-weight:700; color:#059669; }
+        .pop-fuel { font-size:11px; color:#6b7280; }
+        .pop-nav { display:block; margin-top:8px; padding:6px; background:#059669; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; text-align:center; font-family:inherit; width:100%; }
+
+        .marker-label { background:#fff; color:#111; border-radius:6px; padding:3px 7px; font-size:11px; font-weight:700; font-family:'Inter',sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.15); border:1px solid #e5e7eb; text-align:center; white-space:nowrap; }
+        .marker-label.cheap { background:#059669; color:#fff; border-color:#059669; }
+        .marker-label.expensive { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+        .user-dot { background:#3b82f6; border-radius:50%; width:14px; height:14px; border:2px solid #fff; box-shadow:0 1px 4px rgba(59,130,246,.4); }
 
         /* Loading */
-        .loading-overlay { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:9999; flex-direction:column; gap:16px; }
-        .loading-overlay.hidden { display:none; }
-        .spinner { width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; }
+        .loading { position:fixed; inset:0; background:#fff; display:flex; align-items:center; justify-content:center; z-index:9999; flex-direction:column; gap:12px; }
+        .loading.hidden { display:none; }
+        .loading-spinner { width:32px; height:32px; border:3px solid #e5e7eb; border-top-color:#059669; border-radius:50%; animation:spin .7s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
-        .loading-text { font-size:14px; color:var(--text-muted); }
+        .loading-text { font-size:13px; color:#6b7280; }
 
-        .no-results { text-align:center; padding:40px 20px; color:var(--text-muted); }
-        .no-results .icon { font-size:40px; margin-bottom:12px; }
-
-        /* Leaflet dark theme */
-        .leaflet-popup-content-wrapper { background:var(--bg-card)!important; color:var(--text)!important; border-radius:var(--radius)!important; box-shadow:0 4px 20px rgba(0,0,0,.5)!important; }
-        .leaflet-popup-tip { background:var(--bg-card)!important; }
-        .leaflet-popup-content { margin:12px 16px!important; font-family:'Inter',sans-serif!important; font-size:13px!important; }
-        .popup-title { font-weight:700; font-size:14px; margin-bottom:4px; }
-        .popup-address { color:var(--text-muted); font-size:11px; margin-bottom:8px; }
-        .popup-price { font-size:20px; font-weight:800; color:var(--primary); }
-        .popup-fuel-type { font-size:11px; color:var(--text-muted); }
-        .popup-btn { display:block; margin-top:8px; padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; text-align:center; font-family:inherit; width:100%; }
-        .popup-btn:hover { background:var(--primary-dark); }
-
-        .custom-marker { background:var(--primary); color:white; border-radius:8px; padding:3px 7px; font-size:11px; font-weight:700; font-family:'Inter',sans-serif; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); border:2px solid white; text-align:center; line-height:1.2; }
-        .custom-marker.cheapest-marker { background:#059669; border-color:#34d399; font-size:13px; padding:4px 9px; }
-        .custom-marker.expensive-marker { background:var(--danger); border-color:#fca5a5; }
-        .user-marker { background:#3b82f6; color:white; border-radius:50%; width:16px; height:16px; border:3px solid white; box-shadow:0 2px 8px rgba(59,130,246,.5); }
-
-        /* CTA Button */
-        .cta-btn { width:calc(100% - 40px); margin:12px 20px 0; padding:14px 20px; border:none; border-radius:12px; background:linear-gradient(135deg,#10b981,#059669); color:white; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(16,185,129,.35); transition:all .2s; animation:ctaPulse 2s ease-in-out infinite; }
-        .cta-btn:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(16,185,129,.45); }
-        .cta-btn:active { transform:scale(.98); }
-        .cta-btn.loading { animation:none; opacity:.7; pointer-events:none; }
-        .cta-btn.found { background:linear-gradient(135deg,#059669,#047857); animation:none; }
-        @keyframes ctaPulse { 0%,100%{box-shadow:0 4px 15px rgba(16,185,129,.35)} 50%{box-shadow:0 4px 25px rgba(16,185,129,.55)} }
-
-        /* Result card */
-        .cta-result { display:none; margin:0 20px 8px; padding:12px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.08)); border:1px solid rgba(16,185,129,.3); border-radius:12px; }
-        .cta-result.show { display:block; }
-        .cta-result-name { font-size:14px; font-weight:800; margin-bottom:2px; }
-        .cta-result-address { font-size:11px; color:var(--text-muted); margin-bottom:6px; }
-        .cta-result-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-        .cta-result-price { font-size:22px; font-weight:800; color:var(--primary); }
-        .cta-result-detail { font-size:12px; color:var(--text-muted); }
-        .cta-result-nav { margin-top:8px; padding:8px; border:none; border-radius:8px; background:#3b82f6; color:white; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; width:100%; text-align:center; }
-        .cta-result-nav:hover { background:#2563eb; }
-
-        /* Install banner */
-        .install-banner { display:none; padding:8px 20px; background:linear-gradient(135deg,#059669,#10b981); text-align:center; cursor:pointer; }
-        .install-banner.show { display:block; }
-        .install-banner span { font-size:12px; font-weight:600; color:white; }
-
-        /* Mobile tabs */
+        /* Mobile */
         .mobile-tabs { display:none; }
-
-        /* ── MOBILE ─────────────────────────── */
-        @media (max-width: 768px) {
+        @media (max-width:768px) {
             .app { flex-direction:column; position:relative; }
-            .sidebar { width:100%; min-width:unset; height:100%; position:absolute; bottom:0; left:0; right:0; z-index:1001; transition:transform .3s ease; border-right:none; }
-            .sidebar.collapsed { transform:translateY(calc(100% - 50px)); }
-            .map-container { height:100%; }
-
-            .mobile-tabs { display:flex; background:var(--bg); border-bottom:1px solid var(--border); }
-            .mobile-tab { flex:1; padding:14px; text-align:center; font-size:13px; font-weight:600; cursor:pointer; border:none; background:none; color:var(--text-muted); font-family:inherit; border-bottom:2px solid transparent; }
-            .mobile-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
-
-            .mobile-handle { display:block; width:40px; height:4px; background:var(--border); border-radius:2px; margin:8px auto; }
-
-            .header { padding:10px 16px; }
-            .header h1 { font-size:18px; }
-            .controls { padding:8px 16px; gap:6px; }
-            .ig-banner { padding:8px 16px; }
-            .station-list { padding:6px; }
-            .station-card { padding:10px; }
+            .sidebar { width:100%; min-width:unset; height:100%; position:absolute; bottom:0; left:0; right:0; z-index:1001; transition:transform .3s; }
+            .sidebar.collapsed { transform:translateY(calc(100% - 48px)); }
+            .map-area { height:100%; }
+            .mobile-tabs { display:flex; background:#fff; border-bottom:1px solid #e5e7eb; }
+            .mob-tab { flex:1; padding:13px; text-align:center; font-size:13px; font-weight:600; cursor:pointer; border:none; background:none; color:#9ca3af; font-family:inherit; border-bottom:2px solid transparent; }
+            .mob-tab.active { color:#059669; border-bottom-color:#059669; }
+            .header { padding:12px 16px 10px; }
+            .controls { padding:10px 16px; }
         }
     </style>
 </head>
 <body>
 
-<div class="loading-overlay" id="loading">
-    <div class="spinner"></div>
-    <div class="loading-text">Cargando bencineras de la Region de Antofagasta...</div>
+<div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Cargando precios...</div>
 </div>
 
 <div class="app">
-    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <!-- Mobile handle -->
-        <div class="mobile-tabs" id="mobileTabs">
-            <button class="mobile-tab active" onclick="showTab('list')">&#9981; Bencineras</button>
-            <button class="mobile-tab" onclick="showTab('map')">&#128506; Mapa</button>
+        <div class="mobile-tabs">
+            <button class="mob-tab active" onclick="showTab('list')">Lista</button>
+            <button class="mob-tab" onclick="showTab('map')">Mapa</button>
         </div>
 
         <div class="header">
-            <h1>&#9981; Bencina <span>Barata</span></h1>
-            <div class="header-sub">
-                Region de Antofagasta
-                <span class="source-badge" id="sourceBadge">Cargando...</span>
+            <h1>Bencina <span>Barata</span></h1>
+            <div class="header-meta">
+                Region de Antofagasta <span class="badge" id="badge">...</span>
             </div>
         </div>
 
-        <!-- CTA Button -->
-        <button class="cta-btn" id="ctaBtn" onclick="findCheapestNearMe()">
-            &#9981; Bencina mas barata cerca de mi
-        </button>
-
-        <!-- CTA Result -->
-        <div class="cta-result" id="ctaResult">
-            <div class="cta-result-name" id="ctaName"></div>
-            <div class="cta-result-address" id="ctaAddress"></div>
-            <div class="cta-result-row">
-                <div class="cta-result-price" id="ctaPrice"></div>
-                <div class="cta-result-detail" id="ctaDetail"></div>
-            </div>
-            <button class="cta-result-nav" id="ctaNav" onclick="openNavigation()">
-                &#128663; Abrir en Google Maps para ir
-            </button>
-        </div>
-
-        <!-- Instagram Banner -->
-        <a class="ig-banner" href="https://instagram.com/humbertofuentescl" target="_blank" rel="noopener">
-            <img class="ig-avatar-img" src="" id="igAvatar" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">
-            <div class="ig-avatar" style="display:none">&#128100;</div>
-            <div class="ig-info">
-                <div class="ig-name">Humberto Fuentes</div>
-                <div class="ig-handle">@humbertofuentescl</div>
-            </div>
-            <button class="ig-btn" onclick="event.stopPropagation(); window.open('https://instagram.com/humbertofuentescl','_blank')">Seguir</button>
-        </a>
-
-        <!-- Install as app banner -->
-        <div class="install-banner" id="installBanner" onclick="installApp()">
-            <span>&#128242; Instalar como app en tu celular</span>
-        </div>
-
-        <!-- Controls -->
         <div class="controls">
             <div class="control-row">
                 <label>Combustible</label>
@@ -282,403 +154,192 @@
                     <option value="Kerosene">Kerosene</option>
                 </select>
             </div>
-            <div class="control-row">
-                <label>Consumo</label>
-                <input type="number" id="consumption" value="10" min="3" max="30" step="0.5">
-                <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">L/100km</span>
-            </div>
-            <button class="btn btn-location" id="btnLocation" onclick="requestLocation()">
-                &#128205; Usar mi ubicacion
-            </button>
-            <div>
-                <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Comuna</label>
-                <div class="filter-chips" id="comunaChips"></div>
-            </div>
-            <div class="search-box">
-                <span class="search-icon">&#128269;</span>
-                <input type="text" id="searchInput" placeholder="Buscar bencinera...">
-            </div>
+            <button class="btn-location" id="btnLoc" onclick="getLocation()">Usar mi ubicacion</button>
+            <div class="chips" id="chips"></div>
         </div>
 
-        <!-- Route Panel -->
-        <div class="route-panel" id="routePanel">
-            <h4>&#128663; Ruta calculada <button class="route-close" onclick="clearRoute()">&times;</button></h4>
-            <div class="route-summary">
-                <div class="route-stat"><div class="stat-value" id="routeDistance">--</div><div class="stat-label">Distancia</div></div>
-                <div class="route-stat"><div class="stat-value" id="routeTime">--</div><div class="stat-label">Tiempo</div></div>
-                <div class="route-stat cost"><div class="stat-value" id="routeCost">--</div><div class="stat-label">Costo viaje</div></div>
-            </div>
+        <div class="list-header">
+            <h3>Estaciones <span class="count" id="count"></span></h3>
+            <button class="sort-btn" id="sortBtn" onclick="toggleSort()">Precio</button>
         </div>
+        <div class="list" id="list"></div>
 
-        <!-- Station list -->
-        <div class="station-list-header">
-            <h3>Bencineras <span class="station-count" id="stationCount"></span></h3>
-            <button class="sort-toggle" id="sortToggle" onclick="toggleSort()">Precio &#9650;</button>
-        </div>
-        <div class="station-list" id="stationList"></div>
-
-        <!-- Data source footer -->
-        <div class="data-footer">
-            Datos: <a href="https://www.bencinaenlinea.cl" target="_blank">CNE - bencinaenlinea.cl</a> | Creado por <a href="https://instagram.com/humbertofuentescl" target="_blank">@humbertofuentescl</a>
+        <div class="footer">
+            Fuente: <a href="https://www.bencinaenlinea.cl" target="_blank">CNE</a> &middot; Actualizado cada hora
         </div>
     </div>
 
-    <!-- Map -->
-    <div class="map-container">
+    <div class="map-area">
         <div id="map"></div>
-        <div class="map-overlay">
-            <button class="map-btn" onclick="map.setView([-23.4,-69.5],7)" title="Ver toda la region">&#127758;</button>
-            <button class="map-btn" onclick="refreshData()" title="Actualizar precios">&#128260;</button>
+        <div class="map-btns">
+            <button class="map-btn" onclick="map.setView([-23.4,-69.5],7)" title="Ver region">&#127758;</button>
+            <button class="map-btn" onclick="refreshData()" title="Actualizar">&#8635;</button>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── State ──────────────────────────────────────────
-let allEstaciones=[], filteredEstaciones=[];
-let selectedFuel='Gasolina 93', userLocation=null;
-let sortBy='price', selectedStation=null, activeComuna=null;
-let routeLine=null, userMarker=null, markers=[], markerMap={};
-let deferredPrompt=null, cheapestFound=null;
+let all=[], filtered=[], fuel='Gasolina 93', loc=null, sort='price', sel=null, activeC=null;
+let markers=[], mMap={}, userM=null, routeL=null;
 
-// ── PWA Install ────────────────────────────────────
-window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('installBanner').classList.add('show');
-});
-
-function installApp() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(r => {
-        document.getElementById('installBanner').classList.remove('show');
-        deferredPrompt = null;
-    });
+// Mobile
+function showTab(t){
+    const s=document.getElementById('sidebar'), tabs=document.querySelectorAll('.mob-tab');
+    tabs.forEach(x=>x.classList.remove('active'));
+    if(t==='map'){s.classList.add('collapsed');tabs[1].classList.add('active');setTimeout(()=>map.invalidateSize(),300);}
+    else{s.classList.remove('collapsed');tabs[0].classList.add('active');}
 }
 
-// ── Mobile Tabs ────────────────────────────────────
-function showTab(tab) {
-    const sidebar = document.getElementById('sidebar');
-    const tabs = document.querySelectorAll('.mobile-tab');
-    tabs.forEach(t => t.classList.remove('active'));
-    if (tab === 'map') {
-        sidebar.classList.add('collapsed');
-        tabs[1].classList.add('active');
-        setTimeout(() => map.invalidateSize(), 350);
-    } else {
-        sidebar.classList.remove('collapsed');
-        tabs[0].classList.add('active');
-    }
-}
+// Map
+const map=L.map('map',{center:[-23.4,-69.5],zoom:7,zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM',maxZoom:19}).addTo(map);
 
-// ── Map Init ───────────────────────────────────────
-const map = L.map('map', { center:[-23.4,-69.5], zoom:7, zoomControl:false });
-L.control.zoom({ position:'bottomright' }).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19
-}).addTo(map);
-
-// ── Fetch Data ─────────────────────────────────────
-async function fetchEstaciones() {
-    try {
-        const res = await fetch('/api/estaciones');
-        const data = await res.json();
-        allEstaciones = data.estaciones || [];
-        const badge = document.getElementById('sourceBadge');
-        if (data.source === 'fallback') { badge.textContent='Datos referencia'; badge.className='source-badge fallback'; }
-        else { badge.textContent='Precios reales ' + data.source; badge.className='source-badge'; }
-        buildComunaChips();
-        applyFilters();
+// Fetch
+async function fetchData(){
+    try{
+        const r=await fetch('/api/estaciones'), d=await r.json();
+        all=d.estaciones||[];
+        const b=document.getElementById('badge');
+        b.textContent=d.source==='fallback'?'Referencia':'CNE oficial';
+        buildChips(); apply();
         document.getElementById('loading').classList.add('hidden');
-    } catch(err) {
-        document.querySelector('.loading-text').textContent='Error cargando datos.';
-    }
+    }catch(e){document.querySelector('.loading-text').textContent='Error cargando datos.';}
 }
 
-async function refreshData() {
+async function refreshData(){
     document.getElementById('loading').classList.remove('hidden');
-    document.querySelector('.loading-text').textContent='Actualizando precios...';
-    try {
-        const res = await fetch('/api/refresh');
-        const data = await res.json();
-        allEstaciones = data.estaciones || [];
-        const badge = document.getElementById('sourceBadge');
-        if (data.source==='api_cne') { badge.textContent='Precios en vivo CNE'; badge.className='source-badge'; }
-        else { badge.textContent='Datos referencia'; badge.className='source-badge fallback'; }
-        buildComunaChips(); applyFilters();
-    } catch(err) {}
+    document.querySelector('.loading-text').textContent='Actualizando...';
+    try{const r=await fetch('/api/refresh'),d=await r.json();all=d.estaciones||[];buildChips();apply();}catch(e){}
     document.getElementById('loading').classList.add('hidden');
 }
 
-// ── Filters ────────────────────────────────────────
-function applyFilters() {
-    selectedFuel = document.getElementById('fuelType').value;
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    filteredEstaciones = allEstaciones.filter(est => {
-        if (!est.precios[selectedFuel]) return false;
-        if (activeComuna && est.comuna !== activeComuna) return false;
-        if (search) { const h=`${est.nombre} ${est.direccion} ${est.comuna} ${est.distribuidor}`.toLowerCase(); if(!h.includes(search)) return false; }
+// Filters
+function apply(){
+    fuel=document.getElementById('fuelType').value;
+    filtered=all.filter(e=>{
+        if(!e.precios[fuel]) return false;
+        if(activeC&&e.comuna!==activeC) return false;
         return true;
     });
-    if (sortBy==='price') filteredEstaciones.sort((a,b)=>a.precios[selectedFuel]-b.precios[selectedFuel]);
-    else if (sortBy==='distance'&&userLocation) filteredEstaciones.sort((a,b)=>getDist(a)-getDist(b));
-    else filteredEstaciones.sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    renderList(); renderMarkers();
+    if(sort==='price') filtered.sort((a,b)=>a.precios[fuel]-b.precios[fuel]);
+    else if(sort==='dist'&&loc) filtered.sort((a,b)=>dist(a)-dist(b));
+    else filtered.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    render(); renderMap();
 }
 
-function buildComunaChips() {
-    const comunas=[...new Set(allEstaciones.map(e=>e.comuna))].sort();
-    const c=document.getElementById('comunaChips');
-    c.innerHTML=`<button class="chip ${!activeComuna?'active':''}" onclick="filterComuna(null)">Todas</button>`+
-        comunas.map(x=>`<button class="chip ${activeComuna===x?'active':''}" onclick="filterComuna('${x}')">${x}</button>`).join('');
+function buildChips(){
+    const cs=[...new Set(all.map(e=>e.comuna))].sort();
+    document.getElementById('chips').innerHTML=
+        `<button class="chip ${!activeC?'active':''}" onclick="setC(null)">Todas</button>`+
+        cs.map(c=>`<button class="chip ${activeC===c?'active':''}" onclick="setC('${c}')">${c}</button>`).join('');
+}
+function setC(c){activeC=c;buildChips();apply();}
+
+function toggleSort(){
+    const b=document.getElementById('sortBtn');
+    if(sort==='price'){sort=loc?'dist':'name';b.textContent=loc?'Distancia':'Nombre';}
+    else if(sort==='dist'){sort='name';b.textContent='Nombre';}
+    else{sort='price';b.textContent='Precio';}
+    apply();
 }
 
-function filterComuna(c) { activeComuna=c; buildComunaChips(); applyFilters(); }
-
-function toggleSort() {
-    const btn=document.getElementById('sortToggle');
-    if(sortBy==='price'){sortBy=userLocation?'distance':'name';btn.innerHTML=userLocation?'Distancia &#9650;':'Nombre &#9650;';}
-    else if(sortBy==='distance'){sortBy='name';btn.innerHTML='Nombre &#9650;';}
-    else{sortBy='price';btn.innerHTML='Precio &#9650;';}
-    applyFilters();
-}
-
-// ── Render List ────────────────────────────────────
-function renderList() {
-    const container=document.getElementById('stationList');
-    document.getElementById('stationCount').textContent=`(${filteredEstaciones.length})`;
-    if(!filteredEstaciones.length){container.innerHTML='<div class="no-results"><div class="icon">&#9981;</div><p>Sin resultados</p></div>';return;}
-
-    container.innerHTML=filteredEstaciones.map((est,i)=>{
-        const price=est.precios[selectedFuel];
-        const isCheap=i===0&&sortBy==='price';
-        const isActive=selectedStation&&selectedStation.id===est.id;
-        const bc=getBrand(est.distribuidor);
-        const d=userLocation?getDist(est):null;
-        let rHtml='';
-        if(d!==null){
-            const km=d.toFixed(1), min=Math.round(d/80*60);
-            const cons=parseFloat(document.getElementById('consumption').value)||10;
-            const cost=Math.round(d/100*cons*price);
-            rHtml=`<div class="station-route-info"><div class="route-item"><span class="icon">&#128663;</span><span class="value">${km}</span><span class="unit">km</span></div><div class="route-item"><span class="icon">&#9200;</span><span class="value">${min}</span><span class="unit">min</span></div><div class="route-cost">$${cost.toLocaleString('es-CL')}</div></div>`;
-        }
-        const ph=Object.entries(est.precios).map(([t,p])=>{
-            const sel=t===selectedFuel;
-            return `<div class="price-tag ${sel?'selected-fuel':''}"><span class="fuel-type">${t.replace('Gasolina ','G')}</span><span class="fuel-price">$${p.toLocaleString('es-CL')}</span></div>`;
+// Render list
+function render(){
+    const c=document.getElementById('list');
+    document.getElementById('count').textContent=`(${filtered.length})`;
+    if(!filtered.length){c.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af">Sin resultados</div>';return;}
+    c.innerHTML=filtered.map((e,i)=>{
+        const p=e.precios[fuel], cheap=i===0&&sort==='price', act=sel&&sel.id===e.id;
+        const bc=brand(e.distribuidor);
+        const prices=Object.entries(e.precios).map(([t,v])=>{
+            const s=t===fuel;
+            return `<span class="ptag ${s?'sel':''}"><span class="type">${t.replace('Gasolina ','G')}</span> <span class="val">$${v.toLocaleString('es-CL')}</span></span>`;
         }).join('');
-        return `<div class="station-card ${isCheap?'cheapest':''} ${isActive?'active':''}" onclick="selectStation('${est.id}')" id="card-${est.id}">
-            <div class="station-top"><div class="station-name">${est.nombre}</div><span class="station-brand ${bc}">${est.distribuidor}</span></div>
-            <div class="station-address">${est.direccion} - ${est.comuna}</div>
-            <div class="station-prices">${ph}</div>${rHtml}</div>`;
+        let di='';
+        if(loc){const km=dist(e).toFixed(1);di=`<div class="card-dist"><span><strong>${km}</strong> km</span></div>`;}
+        return `<div class="card ${cheap?'cheapest':''} ${act?'active':''}" onclick="pick('${e.id}')" id="c-${e.id}">
+            ${cheap?'<div class="cheapest-label">Mas barata</div>':''}
+            <div class="card-top"><span class="card-name">${e.distribuidor}</span><span class="card-brand ${bc}">${e.distribuidor}</span></div>
+            <div class="card-addr">${e.direccion} &middot; ${e.comuna}</div>
+            <div class="card-prices">${prices}</div>${di}</div>`;
     }).join('');
 }
 
-// ── Render Markers ─────────────────────────────────
-function renderMarkers() {
-    markers.forEach(m=>map.removeLayer(m)); markers=[]; markerMap={};
-    if(!filteredEstaciones.length) return;
-    const prices=filteredEstaciones.map(e=>e.precios[selectedFuel]);
-    const maxP=Math.max(...prices);
-    filteredEstaciones.forEach((est,i)=>{
-        const price=est.precios[selectedFuel];
-        let mc='custom-marker';
-        if(i===0&&sortBy==='price') mc+=' cheapest-marker';
-        else if(price>=maxP*.95) mc+=' expensive-marker';
-        const icon=L.divIcon({className:'',html:`<div class="${mc}">$${price.toLocaleString('es-CL')}</div>`,iconSize:null,iconAnchor:[35,20]});
-        const m=L.marker([est.lat,est.lng],{icon}).addTo(map);
-        const di=userLocation?`<br><small>${getDist(est).toFixed(1)} km</small>`:'';
-        m.bindPopup(`<div class="popup-title">${est.nombre}</div><div class="popup-address">${est.direccion}, ${est.comuna}</div><div class="popup-price">$${price.toLocaleString('es-CL')}</div><div class="popup-fuel-type">${selectedFuel}${di}</div>${userLocation?`<button class="popup-btn" onclick="calcRoute('${est.id}')">&#128663; Calcular ruta</button>`:''}`);
-        m.on('click',()=>selectStation(est.id));
-        markers.push(m); markerMap[est.id]=m;
+// Render map
+function renderMap(){
+    markers.forEach(m=>map.removeLayer(m));markers=[];mMap={};
+    if(!filtered.length) return;
+    const ps=filtered.map(e=>e.precios[fuel]), mx=Math.max(...ps);
+    filtered.forEach((e,i)=>{
+        const p=e.precios[fuel];
+        let cls='marker-label';
+        if(i===0&&sort==='price') cls+=' cheap';
+        else if(p>=mx*.98) cls+=' expensive';
+        const icon=L.divIcon({className:'',html:`<div class="${cls}">$${p.toLocaleString('es-CL')}</div>`,iconSize:null,iconAnchor:[30,15]});
+        const m=L.marker([e.lat,e.lng],{icon}).addTo(map);
+        const dStr=loc?`<br><small>${dist(e).toFixed(1)} km</small>`:'';
+        m.bindPopup(`<div class="pop-name">${e.distribuidor}</div><div class="pop-addr">${e.direccion}, ${e.comuna}</div><div class="pop-price">$${p.toLocaleString('es-CL')}</div><div class="pop-fuel">${fuel}${dStr}</div>${loc?`<button class="pop-nav" onclick="navTo(${e.lat},${e.lng})">Ir con Google Maps</button>`:''}`);
+        m.on('click',()=>pick(e.id));
+        markers.push(m);mMap[e.id]=m;
     });
 }
 
-// ── Select Station ─────────────────────────────────
-function selectStation(id) {
-    const est=allEstaciones.find(e=>e.id===id); if(!est) return;
-    selectedStation=est;
-    document.querySelectorAll('.station-card').forEach(c=>c.classList.remove('active'));
-    const card=document.getElementById(`card-${id}`);
+function pick(id){
+    const e=all.find(x=>x.id===id);if(!e)return;
+    sel=e;
+    document.querySelectorAll('.card').forEach(c=>c.classList.remove('active'));
+    const card=document.getElementById(`c-${id}`);
     if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
-    map.setView([est.lat,est.lng],Math.max(map.getZoom(),12));
-    if(markerMap[id]) markerMap[id].openPopup();
-    if(userLocation) calcRoute(id);
-    // On mobile, switch to map
+    map.setView([e.lat,e.lng],Math.max(map.getZoom(),13));
+    if(mMap[id]) mMap[id].openPopup();
     if(window.innerWidth<=768) showTab('map');
 }
 
-// ── Location ───────────────────────────────────────
-function requestLocation() {
-    const btn=document.getElementById('btnLocation');
-    btn.innerHTML='&#9203; Obteniendo...'; btn.disabled=true;
-    if(!navigator.geolocation){alert('Sin geolocalizacion');btn.innerHTML='&#128205; Usar mi ubicacion';btn.disabled=false;return;}
-    navigator.geolocation.getCurrentPosition(pos=>{
-        userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude};
-        btn.innerHTML=`&#9989; Ubicacion OK`; btn.style.background='#059669';
-        if(userMarker) map.removeLayer(userMarker);
-        userMarker=L.marker([userLocation.lat,userLocation.lng],{icon:L.divIcon({className:'',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map).bindPopup('<strong>Tu ubicacion</strong>');
-        applyFilters();
-    },err=>{
-        alert('No se pudo obtener ubicacion. Toca el mapa para fijar posicion.');
-        btn.innerHTML='&#128205; Usar mi ubicacion'; btn.disabled=false;
-    },{enableHighAccuracy:true,timeout:10000});
+function navTo(lat,lng){window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`,'_blank');}
+
+// Location
+function getLocation(){
+    const b=document.getElementById('btnLoc');
+    b.textContent='Obteniendo...';
+    if(!navigator.geolocation){b.textContent='No disponible';return;}
+    navigator.geolocation.getCurrentPosition(p=>{
+        loc={lat:p.coords.latitude,lng:p.coords.longitude};
+        b.textContent='Ubicacion OK';b.classList.add('active');
+        if(userM)map.removeLayer(userM);
+        userM=L.marker([loc.lat,loc.lng],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
+        apply();
+    },()=>{b.textContent='Usar mi ubicacion';alert('No se pudo obtener ubicacion');},{enableHighAccuracy:true,timeout:10000});
 }
 
 map.on('click',function(e){
-    userLocation={lat:e.latlng.lat,lng:e.latlng.lng};
-    const btn=document.getElementById('btnLocation');
-    btn.innerHTML='&#9989; Posicion en mapa'; btn.style.background='#059669';
-    btn.onclick=()=>{resetLocation()};
-    if(userMarker) map.removeLayer(userMarker);
-    userMarker=L.marker([userLocation.lat,userLocation.lng],{icon:L.divIcon({className:'',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map).bindPopup('<strong>Tu posicion</strong>').openPopup();
-    applyFilters();
+    loc={lat:e.latlng.lat,lng:e.latlng.lng};
+    const b=document.getElementById('btnLoc');
+    b.textContent='Posicion en mapa';b.classList.add('active');
+    if(userM)map.removeLayer(userM);
+    userM=L.marker([loc.lat,loc.lng],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
+    apply();
 });
 
-function resetLocation(){
-    userLocation=null; if(userMarker){map.removeLayer(userMarker);userMarker=null;} clearRoute();
-    const btn=document.getElementById('btnLocation');
-    btn.innerHTML='&#128205; Usar mi ubicacion'; btn.style.background=''; btn.onclick=requestLocation; btn.disabled=false;
-    applyFilters();
-}
-
-// ── Route ──────────────────────────────────────────
-async function calcRoute(stationId) {
-    const est=allEstaciones.find(e=>e.id===stationId);
-    if(!est||!userLocation) return;
-    selectedStation=est;
-    if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-    try {
-        const url=`https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${est.lng},${est.lat}?overview=full&geometries=geojson`;
-        const res=await fetch(url);
-        const data=await res.json();
-        if(data.routes&&data.routes.length>0){
-            const route=data.routes[0];
-            const distKm=(route.distance/1000).toFixed(1);
-            const timeMin=Math.round(route.duration/60);
-            const cons=parseFloat(document.getElementById('consumption').value)||10;
-            const fuelPrice=est.precios[selectedFuel];
-            const tripCost=Math.round(distKm/100*cons*fuelPrice);
-            const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
-            routeLine=L.polyline(coords,{color:'#10b981',weight:4,opacity:.8,dashArray:'10,6'}).addTo(map);
-            map.fitBounds(routeLine.getBounds(),{padding:[50,50]});
-            document.getElementById('routeDistance').textContent=`${distKm} km`;
-            document.getElementById('routeTime').textContent=`${timeMin} min`;
-            document.getElementById('routeCost').textContent=`$${tripCost.toLocaleString('es-CL')}`;
-            document.getElementById('routePanel').classList.add('active');
-            renderList();
-        }
-    } catch(err){ console.error('Route error:',err); }
-}
-
-function clearRoute(){
-    if(routeLine){map.removeLayer(routeLine);routeLine=null;}
-    document.getElementById('routePanel').classList.remove('active');
-    selectedStation=null; renderList();
-}
-
-// ── Utils ──────────────────────────────────────────
-function getDist(est){
-    if(!userLocation) return Infinity;
-    const R=6371,dLat=(est.lat-userLocation.lat)*Math.PI/180,dLng=(est.lng-userLocation.lng)*Math.PI/180;
-    const a=Math.sin(dLat/2)**2+Math.cos(userLocation.lat*Math.PI/180)*Math.cos(est.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+// Utils
+function dist(e){
+    if(!loc) return Infinity;
+    const R=6371,dLat=(e.lat-loc.lat)*Math.PI/180,dLng=(e.lng-loc.lng)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(loc.lat*Math.PI/180)*Math.cos(e.lat*Math.PI/180)*Math.sin(dLng/2)**2;
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-function getBrand(b){
+function brand(b){
     const l=(b||'').toLowerCase();
-    if(l.includes('copec'))return 'brand-copec';if(l.includes('shell'))return 'brand-shell';
-    if(l.includes('enex')||l.includes('petrobras'))return 'brand-enex';if(l.includes('terpel'))return 'brand-terpel';
-    if(l.includes('arauco'))return 'brand-arauco';return 'brand-default';
+    if(l.includes('copec'))return 'b-copec';if(l.includes('shell'))return 'b-shell';
+    if(l.includes('petrobras')||l.includes('enex'))return 'b-petrobras';if(l.includes('terpel'))return 'b-terpel';
+    return 'b-default';
 }
 
-// ── Find Cheapest Near Me ──────────────────────────
-function findCheapestNearMe() {
-    const btn=document.getElementById('ctaBtn');
-    btn.classList.add('loading');
-    btn.innerHTML='&#9203; Obteniendo tu ubicacion...';
-
-    if(!navigator.geolocation){alert('Tu navegador no soporta geolocalizacion');btn.classList.remove('loading');btn.innerHTML='&#9981; Bencina mas barata cerca de mi';return;}
-
-    navigator.geolocation.getCurrentPosition(pos=>{
-        userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude};
-
-        // Add user marker
-        if(userMarker) map.removeLayer(userMarker);
-        userMarker=L.marker([userLocation.lat,userLocation.lng],{icon:L.divIcon({className:'',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map).bindPopup('<strong>Tu ubicacion</strong>');
-
-        // Update location button
-        const locBtn=document.getElementById('btnLocation');
-        locBtn.innerHTML='&#9989; Ubicacion OK'; locBtn.style.background='#059669';
-
-        btn.innerHTML='&#128269; Buscando la mas barata...';
-
-        // Find cheapest with selected fuel, sorted by distance-adjusted score
-        selectedFuel=document.getElementById('fuelType').value;
-        const withFuel=allEstaciones.filter(e=>e.precios[selectedFuel]);
-        if(!withFuel.length){btn.classList.remove('loading');btn.innerHTML='&#9981; Bencina mas barata cerca de mi';alert('No hay estaciones con ese combustible');return;}
-
-        // Sort by price, then by distance for ties
-        withFuel.sort((a,b)=>{
-            const pDiff=a.precios[selectedFuel]-b.precios[selectedFuel];
-            if(pDiff!==0) return pDiff;
-            return getDist(a)-getDist(b);
-        });
-
-        // Take top 5 cheapest and pick closest
-        const top5=withFuel.slice(0,5);
-        top5.sort((a,b)=>getDist(a)-getDist(b));
-        cheapestFound=top5[0];
-
-        const price=cheapestFound.precios[selectedFuel];
-        const dist=getDist(cheapestFound).toFixed(1);
-        const mins=Math.round(getDist(cheapestFound)/80*60);
-        const cons=parseFloat(document.getElementById('consumption').value)||10;
-        const tripCost=Math.round(getDist(cheapestFound)/100*cons*price);
-
-        // Show result
-        document.getElementById('ctaName').textContent=cheapestFound.nombre;
-        document.getElementById('ctaAddress').textContent=`${cheapestFound.direccion} - ${cheapestFound.comuna}`;
-        document.getElementById('ctaPrice').textContent=`$${price.toLocaleString('es-CL')}`;
-        document.getElementById('ctaDetail').innerHTML=`${selectedFuel}<br>${dist} km &middot; ${mins} min &middot; $${tripCost.toLocaleString('es-CL')} viaje`;
-        document.getElementById('ctaResult').classList.add('show');
-
-        btn.classList.remove('loading');
-        btn.classList.add('found');
-        btn.innerHTML=`&#9989; Encontrada: $${price.toLocaleString('es-CL')} en ${cheapestFound.comuna}`;
-
-        // Apply filters and show route
-        applyFilters();
-        selectStation(cheapestFound.id);
-        calcRoute(cheapestFound.id);
-
-    },err=>{
-        btn.classList.remove('loading');
-        btn.innerHTML='&#9981; Bencina mas barata cerca de mi';
-        if(err.code===1) alert('Permiso de ubicacion denegado. Activalo en tu navegador.');
-        else alert('No se pudo obtener ubicacion. Intenta de nuevo.');
-    },{enableHighAccuracy:true,timeout:15000});
-}
-
-function openNavigation() {
-    if(!cheapestFound) return;
-    const url=`https://www.google.com/maps/dir/?api=1&destination=${cheapestFound.lat},${cheapestFound.lng}&travelmode=driving`;
-    window.open(url,'_blank');
-}
-
-// ── Events ─────────────────────────────────────────
-document.getElementById('fuelType').addEventListener('change',applyFilters);
-document.getElementById('consumption').addEventListener('change',()=>{if(selectedStation&&userLocation)calcRoute(selectedStation.id);renderList();});
-document.getElementById('searchInput').addEventListener('input',applyFilters);
-
-// ── Service Worker ─────────────────────────────────
-if('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
-}
-
-// ── Init ───────────────────────────────────────────
-fetchEstaciones();
+document.getElementById('fuelType').addEventListener('change',apply);
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+fetchData();
 </script>
 </body>
 </html>
