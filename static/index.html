@@ -3,204 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bencina Barata Chile</title>
-    <meta name="description" content="Encuentra la bencina mas barata cerca de ti">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Bencina Barata</title>
     <meta name="theme-color" content="#0f172a">
     <link rel="manifest" href="/manifest.json">
     <style>
         :root{--g:#10b981;--bg:#0f172a;--c:#1e293b;--b:#334155;--t:#f1f5f9;--m:#94a3b8;--r:#ef4444;--y:#f59e0b}
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--t);height:100dvh;overflow:hidden;-webkit-tap-highlight-color:transparent}
+        body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--t);height:100dvh;overflow:hidden}
 
         /* SPLASH */
-        .splash{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
-        .splash.off{display:none}
-        .splash h2{font-size:22px;font-weight:800}
-        .splash h2 b{color:var(--g)}
-        .splash p{font-size:14px;color:var(--m);text-align:center}
-        .dot{width:6px;height:6px;background:var(--g);border-radius:50%;display:inline-block;animation:pulse 1.2s ease infinite}
+        #splash{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:12px}
+        #splash.off{display:none}
+        #splash h2{font-size:20px;font-weight:800}
+        #splash h2 b{color:var(--g)}
+        #splash p{font-size:13px;color:var(--m)}
+        .dot{width:5px;height:5px;background:var(--g);border-radius:50%;display:inline-block;animation:p 1.2s ease infinite}
         .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
-        @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+        @keyframes p{0%,100%{opacity:.3}50%{opacity:1}}
 
         /* TABS */
-        .tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--b)}
-        .tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--m);font-family:inherit;border-bottom:3px solid transparent}
+        .tabs{display:flex;border-bottom:1px solid var(--b);position:relative;z-index:2}
+        .tab{flex:1;padding:12px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;border:none;background:var(--bg);color:var(--m);font-family:inherit;border-bottom:3px solid transparent}
         .tab.on{color:var(--g);border-bottom-color:var(--g)}
 
-        /* VIEWS */
-        .view{display:none;flex-direction:column;height:calc(100dvh - 50px);overflow:hidden}
-        .view.on{display:flex}
-        #mapView{height:calc(100dvh - 50px);position:relative}
-        #mapView.on{display:block}
+        /* VIEWS - stacked */
+        .views{position:relative;height:calc(100dvh - 48px)}
+        .v{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+        .v.on{display:flex}
+        #mv{position:absolute;inset:0;display:none}
+        #mv.on{display:block}
         #map{height:100%;width:100%}
 
-        /* HERO */
-        .hero{display:none;padding:16px;background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(5,150,105,.05));border-bottom:1px solid rgba(16,185,129,.2)}
-        .hero.on{display:block}
-        .hero-label{font-size:11px;color:var(--g);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-        .hero-price{font-size:34px;font-weight:900;color:var(--g)}
-        .hero-name{font-size:15px;font-weight:700;margin-top:8px}
-        .hero-addr{font-size:12px;color:var(--m);margin-top:2px}
-        .hero-km{font-size:13px;color:var(--m);margin-top:4px}
-        .hero-km b{color:var(--t)}
-        .hero-go{margin-top:10px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--g);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
-
-        /* CONTROLS - solo combustible */
-        .ctrls{padding:10px 16px;border-bottom:1px solid var(--b);display:flex;gap:6px;align-items:center}
-        .ctrls select{flex:1;background:var(--c);border:1px solid var(--b);color:var(--t);padding:10px;border-radius:8px;font-size:14px;font-family:inherit;-webkit-appearance:none}
-        .gps-btn{padding:10px 14px;border:1px solid var(--g);border-radius:8px;background:transparent;color:var(--g);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
-        .gps-btn.active{background:var(--g);color:#fff}
-
-        /* LIST HEADER */
-        .lh{padding:8px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b)}
-        .lh h3{font-size:13px;font-weight:700}
-        .lh .n{color:var(--m);font-weight:400}
-        .sbtn{font-size:12px;color:var(--g);cursor:pointer;background:none;border:none;font-family:inherit;font-weight:700}
+        /* CONTROLS */
+        .ctrl{padding:8px 12px;border-bottom:1px solid var(--b);display:flex;gap:6px;align-items:center}
+        .ctrl select{flex:1;background:var(--c);border:1px solid var(--b);color:var(--t);padding:9px 10px;border-radius:8px;font-size:13px;font-family:inherit;-webkit-appearance:none}
+        .gbtn{padding:9px 12px;border:1px solid var(--g);border-radius:8px;background:transparent;color:var(--g);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+        .gbtn.on{background:var(--g);color:#fff}
 
         /* LIST */
-        .ls{flex:1;overflow-y:auto;padding:6px 10px;-webkit-overflow-scrolling:touch}
+        .ls{flex:1;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch}
 
-        /* CARD */
-        .cd{background:var(--c);border-radius:12px;padding:12px 14px;margin-bottom:6px;cursor:pointer;border:2px solid transparent}
-        .cd.best{border-color:var(--g)}
-        .cd-r1{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-        .cd-brand{font-size:14px;font-weight:800}
-        .cd-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;text-transform:uppercase}
-        .bg-copec{background:#dc2626;color:#fff}.bg-shell{background:#facc15;color:#1a1a1a}.bg-petro{background:#22c55e;color:#fff}.bg-terp{background:#f97316;color:#fff}.bg-def{background:#475569;color:#fff}
-        .cd-addr{font-size:11px;color:var(--m);margin-bottom:8px}
-        .cd-price{font-size:20px;font-weight:900;margin-bottom:4px}
-        .cd-others{font-size:11px;color:var(--m)}
-        .cd-others b{color:var(--t);font-weight:600}
-        .p-low{color:var(--g)}.p-mid{color:var(--y)}.p-hi{color:var(--r)}
-        .cd-bot{margin-top:8px;padding-top:8px;border-top:1px solid var(--b);display:flex;align-items:center;justify-content:space-between}
-        .cd-km{font-size:13px;color:var(--m)}
-        .cd-km b{color:var(--t)}
-        .cd-go{padding:7px 16px;border:none;border-radius:8px;background:var(--g);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
-        .best-tag{font-size:10px;font-weight:800;color:var(--g);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+        /* ROW - ultra compact */
+        .row{display:flex;align-items:center;background:var(--c);border-radius:10px;padding:10px 12px;margin-bottom:4px;gap:10px;cursor:pointer;border:2px solid transparent}
+        .row.best{border-color:var(--g)}
+        .row-info{flex:1;min-width:0}
+        .row-brand{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .row-sub{font-size:11px;color:var(--m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .row-price{font-size:18px;font-weight:900;text-align:right;min-width:70px}
+        .row-km{font-size:11px;color:var(--m);text-align:right}
+        .row-go{padding:6px 12px;border:none;border-radius:7px;background:var(--g);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+        .pl{color:var(--g)}.pm{color:var(--y)}.ph{color:var(--r)}
+
+        /* EMPTY STATE */
+        .empty{text-align:center;padding:60px 20px;color:var(--m)}
+        .empty h3{font-size:16px;color:var(--t);margin-bottom:8px}
+        .empty p{font-size:13px;line-height:1.5}
+        .empty button{margin-top:16px;padding:12px 24px;border:none;border-radius:10px;background:var(--g);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
 
         /* FOOTER */
-        .ft{padding:10px 16px;border-top:1px solid var(--b);font-size:11px;color:var(--m);text-align:center;line-height:1.6}
+        .ft{padding:6px 12px;border-top:1px solid var(--b);font-size:10px;color:var(--m);text-align:center}
         .ft a{color:var(--g);text-decoration:none;font-weight:700}
-        .ig{display:inline-flex;align-items:center;gap:4px;background:var(--c);padding:3px 10px;border-radius:20px;margin-top:2px}
 
         /* MAP BTNS */
         .mbtns{position:absolute;top:10px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:6px}
-        .mb{background:var(--c);border:1px solid var(--b);color:var(--t);width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+        .mb{background:var(--c);border:1px solid var(--b);color:var(--t);width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 
         /* MAP POPUP */
-        .leaflet-popup-content-wrapper{background:var(--c)!important;color:var(--t)!important;border-radius:12px!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important}
+        .leaflet-popup-content-wrapper{background:var(--c)!important;color:var(--t)!important;border-radius:10px!important;box-shadow:0 4px 16px rgba(0,0,0,.5)!important}
         .leaflet-popup-tip{background:var(--c)!important}
-        .leaflet-popup-content{margin:12px 16px!important;font-size:13px!important}
+        .leaflet-popup-content{margin:10px 14px!important;font-size:13px!important}
         .pn{font-weight:800;font-size:14px;margin-bottom:2px}
-        .pa{color:var(--m);font-size:11px;margin-bottom:6px}
-        .pp{font-size:22px;font-weight:900;color:var(--g)}
-        .pg{display:block;margin-top:8px;padding:9px;background:var(--g);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit;width:100%}
-        .mk{background:var(--g);color:#fff;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid rgba(255,255,255,.8);text-align:center;white-space:nowrap}
-        .mk.ch{background:#059669;border-color:#34d399;font-size:12px;padding:4px 8px}
+        .pa{color:var(--m);font-size:11px;margin-bottom:4px}
+        .pp{font-size:20px;font-weight:900;color:var(--g)}
+        .pg{display:block;margin-top:6px;padding:8px;background:var(--g);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;width:100%}
+        .mk{background:var(--g);color:#fff;border-radius:5px;padding:2px 5px;font-size:10px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.7);white-space:nowrap}
+        .mk.ch{background:#059669;border-color:#34d399;font-size:11px}
         .mk.ex{background:var(--r);border-color:#fca5a5}
-        .ud{background:#3b82f6;border-radius:50%;width:14px;height:14px;border:3px solid #fff;box-shadow:0 0 10px rgba(59,130,246,.6)}
+        .ud{background:#3b82f6;border-radius:50%;width:14px;height:14px;border:3px solid #fff;box-shadow:0 0 8px rgba(59,130,246,.5)}
+
+        /* LEAFLET FIX */
+        .leaflet-control-zoom{display:none}
     </style>
 </head>
 <body>
 
-<div class="splash" id="splash">
+<div id="splash">
     <h2>&#9981; Bencina <b>Barata</b></h2>
-    <p>Buscando precios cerca de ti<br><span class="dot"></span> <span class="dot"></span> <span class="dot"></span></p>
+    <p>Cargando precios <span class="dot"></span> <span class="dot"></span> <span class="dot"></span></p>
 </div>
 
-<!-- TABS -->
 <div class="tabs">
     <button class="tab on" id="t1" onclick="sw('list')">&#9981; Estaciones</button>
     <button class="tab" id="t2" onclick="sw('map')">&#128506; Mapa</button>
 </div>
 
-<!-- LIST VIEW -->
-<div class="view on" id="listView">
-    <div class="hero" id="hero">
-        <div class="hero-label">&#127942; La mas barata cerca</div>
-        <div class="hero-price" id="hP"></div>
-        <div class="hero-name" id="hN"></div>
-        <div class="hero-addr" id="hA"></div>
-        <div class="hero-km" id="hD"></div>
-        <button class="hero-go" id="hB" onclick="goBest()">&#128663; Ir con Google Maps</button>
+<div class="views">
+    <!-- LIST -->
+    <div class="v on" id="lv">
+        <div class="ctrl">
+            <select id="fuel">
+                <option value="Gasolina 93">Gasolina 93</option>
+                <option value="Gasolina 95">Gasolina 95</option>
+                <option value="Gasolina 97">Gasolina 97</option>
+                <option value="Diesel">Diesel</option>
+                <option value="Kerosene">Kerosene</option>
+            </select>
+            <button class="gbtn" id="gb" onclick="getGPS()">&#128205; GPS</button>
+        </div>
+        <div class="ls" id="ls"></div>
+        <div class="ft">
+            <a href="https://www.bencinaenlinea.cl" target="_blank">CNE</a> &#183;
+            Hecho en Tocopilla &#128293; &#183;
+            <a href="https://instagram.com/humbertofuentescl" target="_blank">&#128247; @humbertofuentescl</a>
+        </div>
     </div>
-    <div class="ctrls">
-        <select id="fuelSel">
-            <option value="Gasolina 93">Gasolina 93</option>
-            <option value="Gasolina 95">Gasolina 95</option>
-            <option value="Gasolina 97">Gasolina 97</option>
-            <option value="Diesel">Diesel</option>
-            <option value="Kerosene">Kerosene</option>
-        </select>
-        <button class="gps-btn" id="gpsBtn" onclick="getGPS()">&#128205; GPS</button>
-    </div>
-    <div class="lh">
-        <h3>Estaciones <span class="n" id="cnt"></span></h3>
-        <button class="sbtn" id="sbtn" onclick="nextSort()">Precio &#9660;</button>
-    </div>
-    <div class="ls" id="ls"></div>
-    <div class="ft">
-        Datos oficiales <a href="https://www.bencinaenlinea.cl" target="_blank">CNE</a> actualizados cada hora<br>
-        Hecho desde Tocopilla &#128293;
-        <span class="ig"><a href="https://instagram.com/humbertofuentescl" target="_blank">&#128247; @humbertofuentescl</a></span>
-    </div>
-</div>
 
-<!-- MAP VIEW -->
-<div id="mapView">
-    <div id="map"></div>
-    <div class="mbtns">
-        <button class="mb" onclick="goMe()">&#128205;</button>
-        <button class="mb" onclick="fitAll()">&#127758;</button>
-        <button class="mb" onclick="doReload()">&#8635;</button>
+    <!-- MAP -->
+    <div id="mv">
+        <div id="map"></div>
+        <div class="mbtns">
+            <button class="mb" onclick="goMe()">&#128205;</button>
+            <button class="mb" onclick="fitAll()">&#127758;</button>
+        </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var D=[],F=[],fuel='Gasolina 93',me=null,srt='price',best=null,pMin=0,pMax=0;
-var MK=[],MM={},uM=null,map;
+var D=[],F=[],fuel='Gasolina 93',me=null,srt='price',pMin=0,pMax=0,best=null;
+var MK=[],MM={},uM=null,map=null,seen={};
 
-function initMap(){
-    map=L.map('map',{center:[-33.45,-70.65],zoom:5,zoomControl:false});
-    L.control.zoom({position:'bottomright'}).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);
-    map.on('click',function(ev){
-        me={lat:ev.latlng.lat,lng:ev.latlng.lng};
-        placeMe();run();showBest();
-        document.getElementById('gpsBtn').classList.add('active');
-    });
-}
-
-// TABS
 function sw(v){
     var t1=document.getElementById('t1'),t2=document.getElementById('t2');
-    var lv=document.getElementById('listView'),mv=document.getElementById('mapView');
+    var lv=document.getElementById('lv'),mv=document.getElementById('mv');
+    t1.classList.remove('on');t2.classList.remove('on');
+    lv.classList.remove('on');mv.classList.remove('on');
     if(v==='map'){
-        lv.classList.remove('on');mv.classList.add('on');
-        t1.classList.remove('on');t2.classList.add('on');
+        t2.classList.add('on');mv.classList.add('on');
         if(!map)initMap();
-        setTimeout(function(){map.invalidateSize()},100);
-        renderMap();
+        setTimeout(function(){map.invalidateSize();renderMap()},150);
     }else{
-        mv.classList.remove('on');lv.classList.add('on');
-        t2.classList.remove('on');t1.classList.add('on');
+        t1.classList.add('on');lv.classList.add('on');
     }
 }
 
-// LOAD
+function initMap(){
+    map=L.map('map',{center:[-33.45,-70.65],zoom:5,zoomControl:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);
+    map.on('click',function(ev){
+        me={lat:ev.latlng.lat,lng:ev.latlng.lng};
+        placeMe();run();
+        document.getElementById('gb').classList.add('on');
+    });
+}
+
 function load(){
     fetch('/api/estaciones').then(function(r){return r.json()}).then(function(d){
-        D=d.estaciones||[];
-        // Auto GPS
+        D=dedupe(d.estaciones||[]);
         if(navigator.geolocation){
             navigator.geolocation.getCurrentPosition(function(p){
                 me={lat:p.coords.latitude,lng:p.coords.longitude};
-                document.getElementById('gpsBtn').classList.add('active');
-                srt='price';run();showBest();
+                document.getElementById('gb').classList.add('on');
+                run();
                 document.getElementById('splash').classList.add('off');
-                // Watch
                 navigator.geolocation.watchPosition(function(p2){
                     me={lat:p2.coords.latitude,lng:p2.coords.longitude};
                     if(uM&&map)placeMe();
@@ -210,142 +175,111 @@ function load(){
                 document.getElementById('splash').classList.add('off');
             },{enableHighAccuracy:true,timeout:8000});
         }else{
-            run();
-            document.getElementById('splash').classList.add('off');
+            run();document.getElementById('splash').classList.add('off');
         }
     }).catch(function(){
-        document.querySelector('.splash p').textContent='Error cargando datos';
+        document.querySelector('#splash p').textContent='Error. Recarga.';
     });
+}
+
+// Deduplicate stations by lat+lng+brand
+function dedupe(arr){
+    var out=[],keys={};
+    for(var i=0;i<arr.length;i++){
+        var e=arr[i];
+        var k=e.lat.toFixed(4)+','+e.lng.toFixed(4)+','+e.distribuidor;
+        if(!keys[k]){keys[k]=1;out.push(e)}
+    }
+    return out;
 }
 
 function getGPS(){
     if(!navigator.geolocation)return;
-    var btn=document.getElementById('gpsBtn');
+    var btn=document.getElementById('gb');
     btn.textContent='...';
     navigator.geolocation.getCurrentPosition(function(p){
         me={lat:p.coords.latitude,lng:p.coords.longitude};
-        btn.classList.add('active');
-        btn.innerHTML='&#128205; GPS';
-        srt='price';run();showBest();
+        btn.classList.add('on');btn.innerHTML='&#128205; GPS';
+        run();
         if(map){placeMe();map.setView([me.lat,me.lng],12)}
-    },function(){
-        btn.innerHTML='&#128205; GPS';
-    },{enableHighAccuracy:true,timeout:8000});
+    },function(){btn.innerHTML='&#128205; GPS'},
+    {enableHighAccuracy:true,timeout:8000});
 }
 
-function doReload(){
-    document.getElementById('splash').classList.remove('off');
-    document.querySelector('.splash p').innerHTML='Actualizando<br><span class="dot"></span> <span class="dot"></span> <span class="dot"></span>';
-    fetch('/api/refresh').then(function(r){return r.json()}).then(function(d){
-        D=d.estaciones||[];run();if(me)showBest();
-        document.getElementById('splash').classList.add('off');
-    }).catch(function(){document.getElementById('splash').classList.add('off')});
-}
-
-// BEST
-function showBest(){
-    if(!me||!D.length){document.getElementById('hero').classList.remove('on');best=null;return}
-    var near=[];
-    for(var i=0;i<D.length;i++){
-        var e=D[i];
-        if(e.precios[fuel]&&e.precios[fuel]>=500&&dst(e)<=80)near.push(e);
-    }
-    if(!near.length){document.getElementById('hero').classList.remove('on');best=null;return}
-    near.sort(function(a,b){return a.precios[fuel]-b.precios[fuel]});
-    best=near[0];
-    var km=dst(best).toFixed(1);
-    document.getElementById('hP').textContent='$'+best.precios[fuel].toLocaleString('es-CL');
-    document.getElementById('hN').textContent=best.distribuidor+' - '+best.comuna;
-    document.getElementById('hA').textContent=best.direccion;
-    document.getElementById('hD').innerHTML='A <b>'+km+' km</b> de ti';
-    document.getElementById('hero').classList.add('on');
-}
-function goBest(){if(best)window.open('https://www.google.com/maps/dir/?api=1&destination='+best.lat+','+best.lng+'&travelmode=driving','_blank')}
-
-// FILTER
 function run(){
-    fuel=document.getElementById('fuelSel').value;
+    fuel=document.getElementById('fuel').value;
     F=[];
     for(var i=0;i<D.length;i++){
         var e=D[i];
-        if(!e.precios[fuel]||e.precios[fuel]<500)continue;
+        if(!e.precios[fuel]||e.precios[fuel]<800)continue;
         if(me&&dst(e)>80)continue;
         F.push(e);
     }
     if(srt==='price')F.sort(function(a,b){return a.precios[fuel]-b.precios[fuel]});
     else if(srt==='dist'&&me)F.sort(function(a,b){return dst(a)-dst(b)});
     if(F.length){
-        pMin=F[0].precios[fuel];pMax=F[F.length-1].precios[fuel];
-        if(srt!=='price'){pMin=Infinity;pMax=0;for(var j=0;j<F.length;j++){var pp=F[j].precios[fuel];if(pp<pMin)pMin=pp;if(pp>pMax)pMax=pp}}
+        pMin=Infinity;pMax=0;
+        for(var j=0;j<F.length;j++){
+            var pp=F[j].precios[fuel];
+            if(pp<pMin)pMin=pp;if(pp>pMax)pMax=pp;
+        }
     }
     renderList();
     if(map)renderMap();
 }
 
-function nextSort(){
-    var b=document.getElementById('sbtn');
-    if(srt==='price'){srt=me?'dist':'price';b.textContent=me?'Distancia \u25BC':'Precio \u25BC'}
-    else{srt='price';b.textContent='Precio \u25BC'}
-    run();
-}
-
 function pc(p){
-    if(pMax===pMin)return 'p-low';
+    if(pMax===pMin)return 'pl';
     var r=(p-pMin)/(pMax-pMin);
-    return r<=.33?'p-low':r<=.66?'p-mid':'p-hi';
+    return r<=.33?'pl':r<=.66?'pm':'ph';
 }
 
-// RENDER LIST
 function renderList(){
     var el=document.getElementById('ls');
-    document.getElementById('cnt').textContent='('+F.length+')';
-    if(!F.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--m)">'+(me?'Sin estaciones a 80km':'Activa GPS para ver cercanas')+'</div>';return}
+    if(!me){
+        el.innerHTML='<div class="empty"><h3>&#128205; Activa tu ubicacion</h3><p>Asi te mostramos las estaciones<br>mas baratas cerca de ti</p><button onclick="getGPS()">Activar GPS</button></div>';
+        return;
+    }
+    if(!F.length){
+        el.innerHTML='<div class="empty"><h3>Sin estaciones</h3><p>No hay estaciones con '+fuel+' a 80km</p></div>';
+        return;
+    }
     var h='';
-    var max=F.length>200?200:F.length;
+    var max=F.length>100?100:F.length;
     for(var i=0;i<max;i++){
-        var e=F[i],p=e.precios[fuel],cheap=i===0&&srt==='price';
-        var bg=bdg(e.distribuidor);
-        var others='';
-        var keys=Object.keys(e.precios);
-        for(var k=0;k<keys.length;k++){
-            if(keys[k]!==fuel&&e.precios[keys[k]]>=500)others+='<span>'+keys[k].replace('Gasolina ','G')+' <b>$'+e.precios[keys[k]].toLocaleString('es-CL')+'</b></span> ';
-        }
-        var bot='';
-        if(me){
-            var km=dst(e).toFixed(1);
-            bot='<div class="cd-bot"><span class="cd-km"><b>'+km+' km</b></span><button class="cd-go" onclick="event.stopPropagation();nav('+e.lat+','+e.lng+')">Ir &#8594;</button></div>';
-        }
-        h+='<div class="cd'+(cheap?' best':'')+'" onclick="pick(\''+e.id+'\')">';
-        if(cheap)h+='<div class="best-tag">&#127942; Mas barata</div>';
-        h+='<div class="cd-r1"><span class="cd-brand">'+e.distribuidor+'</span><span class="cd-badge '+bg+'">'+(e.comuna||'')+'</span></div>';
-        h+='<div class="cd-addr">'+e.direccion+'</div>';
-        h+='<div class="cd-price '+pc(p)+'">$'+p.toLocaleString('es-CL')+'</div>';
-        if(others)h+='<div class="cd-others">'+others+'</div>';
-        h+=bot+'</div>';
+        var e=F[i],p=e.precios[fuel],km=dst(e).toFixed(1);
+        var cheap=i===0&&srt==='price';
+        h+='<div class="row'+(cheap?' best':'')+'" onclick="pick(\''+e.id+'\')">';
+        h+='<div class="row-info">';
+        h+='<div class="row-brand">'+(cheap?'&#127942; ':'')+e.distribuidor+'</div>';
+        h+='<div class="row-sub">'+e.comuna+' &#183; '+km+' km</div>';
+        h+='</div>';
+        h+='<div><div class="row-price '+pc(p)+'">$'+p.toLocaleString('es-CL')+'</div></div>';
+        h+='<button class="row-go" onclick="event.stopPropagation();nav('+e.lat+','+e.lng+')">Ir</button>';
+        h+='</div>';
     }
     el.innerHTML=h;
 }
 
-// RENDER MAP
 function renderMap(){
     if(!map)return;
     for(var i=0;i<MK.length;i++)map.removeLayer(MK[i]);
     MK=[];MM={};
-    var show=F.length>100?F.slice(0,100):F;
+    var show=F.length>80?F.slice(0,80):F;
     for(var i=0;i<show.length;i++){
         var e=show[i],p=e.precios[fuel];
         var cls='mk';
         if(i===0&&srt==='price')cls+=' ch';
-        else if(pc(p)==='p-hi')cls+=' ex';
-        var icon=L.divIcon({className:'',html:'<div class="'+cls+'">$'+p.toLocaleString('es-CL')+'</div>',iconSize:null,iconAnchor:[25,12]});
+        else if(pc(p)==='ph')cls+=' ex';
+        var icon=L.divIcon({className:'',html:'<div class="'+cls+'">$'+p.toLocaleString('es-CL')+'</div>',iconSize:null,iconAnchor:[22,10]});
         var m=L.marker([e.lat,e.lng],{icon:icon}).addTo(map);
-        var dStr=me?'<br><small>'+dst(e).toFixed(1)+' km</small>':'';
-        var popup='<div class="pn">'+e.distribuidor+'</div><div class="pa">'+e.direccion+', '+e.comuna+'</div><div class="pp">$'+p.toLocaleString('es-CL')+'</div>'+dStr;
-        if(me)popup+='<button class="pg" onclick="nav('+e.lat+','+e.lng+')">&#128663; Ir</button>';
+        var popup='<div class="pn">'+e.distribuidor+'</div><div class="pa">'+e.direccion+', '+e.comuna+'</div><div class="pp">$'+p.toLocaleString('es-CL')+'</div>';
+        if(me)popup+='<button class="pg" onclick="nav('+e.lat+','+e.lng+')">Ir &#8594;</button>';
         m.bindPopup(popup);
         MK.push(m);MM[e.id]=m;
     }
     placeMe();
+    if(me&&!show.length)map.setView([me.lat,me.lng],12);
 }
 
 function pick(id){
@@ -355,17 +289,16 @@ function pick(id){
     setTimeout(function(){
         map.setView([e.lat,e.lng],14);
         if(MM[id])MM[id].openPopup();
-    },200);
+    },250);
 }
 
-function nav(lat,lng){window.open('https://www.google.com/maps/dir/?api=1&destination='+lat+','+lng+'&travelmode=driving','_blank')}
+function nav(la,ln){window.open('https://www.google.com/maps/dir/?api=1&destination='+la+','+ln+'&travelmode=driving','_blank')}
 function goMe(){if(me&&map)map.setView([me.lat,me.lng],13)}
 function fitAll(){
-    if(!map)return;
-    if(!F.length){map.setView([-33.45,-70.65],5);return}
-    var bounds=[];var max=F.length>100?100:F.length;
-    for(var i=0;i<max;i++)bounds.push([F[i].lat,F[i].lng]);
-    map.fitBounds(bounds,{padding:[20,20]});
+    if(!map||!F.length)return;
+    var b=[];var mx=F.length>80?80:F.length;
+    for(var i=0;i<mx;i++)b.push([F[i].lat,F[i].lng]);
+    map.fitBounds(b,{padding:[15,15]});
 }
 function placeMe(){
     if(!me||!map)return;
@@ -373,21 +306,14 @@ function placeMe(){
     uM=L.marker([me.lat,me.lng],{icon:L.divIcon({className:'',html:'<div class="ud"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
 }
 
-// UTILS
 function dst(e){
     if(!me)return 99999;
     var R=6371,dLa=(e.lat-me.lat)*Math.PI/180,dLo=(e.lng-me.lng)*Math.PI/180;
     var a=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(me.lat*Math.PI/180)*Math.cos(e.lat*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2);
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-function bdg(b){
-    var l=(b||'').toLowerCase();
-    if(l.indexOf('copec')>=0)return 'bg-copec';if(l.indexOf('shell')>=0)return 'bg-shell';
-    if(l.indexOf('petrobras')>=0||l.indexOf('enex')>=0)return 'bg-petro';if(l.indexOf('terpel')>=0)return 'bg-terp';
-    return 'bg-def';
-}
 
-document.getElementById('fuelSel').addEventListener('change',function(){run();if(me)showBest()});
+document.getElementById('fuel').addEventListener('change',function(){run()});
 load();
 </script>
 </body>
