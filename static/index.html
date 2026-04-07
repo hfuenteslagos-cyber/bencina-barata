@@ -27,12 +27,12 @@
         .tab.on{color:var(--g);border-bottom-color:var(--g)}
 
         /* VIEWS - stacked */
-        .views{position:relative;height:calc(100dvh - 48px)}
-        .v{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+        .views{position:relative;height:calc(100dvh - 48px);overflow:hidden}
+        .v{position:absolute;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;overflow:hidden}
         .v.on{display:flex}
-        #mv{position:absolute;inset:0;display:none}
+        #mv{position:absolute;top:0;left:0;width:100%;height:100%;display:none}
         #mv.on{display:block}
-        #map{height:100%;width:100%}
+        #map{position:absolute;top:0;left:0;width:100%;height:100%}
 
         /* CONTROLS */
         .ctrl{padding:8px 12px;border-bottom:1px solid var(--b);display:flex;gap:6px;align-items:center}
@@ -141,7 +141,9 @@ function sw(v){
     if(v==='map'){
         t2.classList.add('on');mv.classList.add('on');
         if(!map)initMap();
-        setTimeout(function(){map.invalidateSize();renderMap()},150);
+        setTimeout(function(){map.invalidateSize();renderMap()},100);
+        setTimeout(function(){map.invalidateSize()},300);
+        setTimeout(function(){map.invalidateSize()},600);
     }else{
         t1.classList.add('on');lv.classList.add('on');
     }
