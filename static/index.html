@@ -178,7 +178,8 @@
     <div class="map-area">
         <div id="map"></div>
         <div class="map-btns">
-            <button class="map-btn" onclick="map.setView([-33.45,-70.65],5)" title="Ver Chile">&#127758;</button>
+            <button class="map-btn" onclick="centerOnResults()" title="Centrar en resultados">&#127758;</button>
+            <button class="map-btn" onclick="centerOnMe()" title="Centrar en mi">&#128205;</button>
             <button class="map-btn" onclick="refreshData()" title="Actualizar">&#8635;</button>
         </div>
     </div>
@@ -315,6 +316,17 @@ function pick(id){
 
 function navTo(lat,lng){window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`,'_blank');}
 
+function centerOnResults(){
+    if(!filtered.length){map.setView([-33.45,-70.65],5);return;}
+    const bounds=L.latLngBounds(filtered.map(e=>[e.lat,e.lng]));
+    map.fitBounds(bounds,{padding:[30,30]});
+}
+
+function centerOnMe(){
+    if(loc){map.setView([loc.lat,loc.lng],13);return;}
+    getLocation();
+}
+
 // Location - tiempo real
 let watchId=null;
 function getLocation(){
@@ -356,7 +368,7 @@ function brand(b){
 }
 
 document.getElementById('fuelType').addEventListener('change',apply);
-document.getElementById('regionSel').addEventListener('change',()=>{activeC=null;buildChips();apply();});
+document.getElementById('regionSel').addEventListener('change',()=>{activeC=null;buildChips();apply();centerOnResults();});
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 fetchData();
 </script>
