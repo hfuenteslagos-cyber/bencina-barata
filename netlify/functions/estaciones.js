@@ -4,7 +4,7 @@ const zlib = require('zlib');
 
 const CNE_LOGIN_URL = 'https://api.cne.cl/api/login';
 const CNE_ESTACIONES_URL = 'https://api.cne.cl/api/v4/estaciones';
-const REGION_ANTOFAGASTA = '02';
+// Sin filtro de region - todo Chile
 
 // Cache en memoria (persiste entre invocaciones en caliente)
 let cache = { data: null, timestamp: 0 };
@@ -146,10 +146,7 @@ function parseEstaciones(raw) {
   for (const e of lista) {
     try {
       const ubi = e.ubicacion || {};
-      const region = ubi.codigo_region || ubi.region_id || '';
-
-      // Solo Region de Antofagasta
-      if (String(region) !== REGION_ANTOFAGASTA && String(region) !== '2') continue;
+      const region = ubi.nombre_region || '';
 
       const lat = parseFloat(ubi.latitud || ubi.lat || 0);
       const lng = parseFloat(ubi.longitud || ubi.lng || ubi.lon || 0);
@@ -161,7 +158,8 @@ function parseEstaciones(raw) {
       );
 
       const direccion = ubi.direccion || ubi.calle || '';
-      const comuna = ubi.nombre_comuna || ubi.comuna || guessComuna(lat, lng);
+      const comuna = ubi.nombre_comuna || ubi.comuna || '';
+      const regionNombre = region;
       const id = e.codigo || e.id || `s${estaciones.length}`;
 
       // Precios - claves: 93/A93, 95/A95, 97/A97, DI/ADI, KE, GLP
@@ -182,7 +180,7 @@ function parseEstaciones(raw) {
 
       if (Object.keys(precios).length > 0) {
         estaciones.push({
-          id, nombre: `${distribuidor} - ${direccion}`, direccion, comuna,
+          id, nombre: `${distribuidor} - ${direccion}`, direccion, comuna, region: regionNombre,
           distribuidor, lat, lng, precios,
         });
       }

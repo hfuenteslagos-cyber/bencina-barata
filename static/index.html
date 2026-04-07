@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bencina Barata - Antofagasta</title>
-    <meta name="description" content="Precios de bencina en la Region de Antofagasta. Datos oficiales CNE.">
+    <title>Bencina Barata Chile</title>
+    <meta name="description" content="Encuentra la bencina mas barata en Chile. Precios oficiales CNE actualizados.">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Bencina Barata">
@@ -139,11 +139,17 @@
         <div class="header">
             <h1>Bencina <span>Barata</span></h1>
             <div class="header-meta">
-                Region de Antofagasta <span class="badge" id="badge">...</span>
+                Chile <span class="badge" id="badge">...</span>
             </div>
         </div>
 
         <div class="controls">
+            <div class="control-row">
+                <label>Region</label>
+                <select id="regionSel">
+                    <option value="">Todas</option>
+                </select>
+            </div>
             <div class="control-row">
                 <label>Combustible</label>
                 <select id="fuelType">
@@ -172,7 +178,7 @@
     <div class="map-area">
         <div id="map"></div>
         <div class="map-btns">
-            <button class="map-btn" onclick="map.setView([-23.4,-69.5],7)" title="Ver region">&#127758;</button>
+            <button class="map-btn" onclick="map.setView([-33.45,-70.65],5)" title="Ver Chile">&#127758;</button>
             <button class="map-btn" onclick="refreshData()" title="Actualizar">&#8635;</button>
         </div>
     </div>
@@ -180,8 +186,8 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let all=[], filtered=[], fuel='Gasolina 93', loc=null, sort='price', sel=null, activeC=null;
-let markers=[], mMap={}, userM=null, routeL=null;
+let all=[], filtered=[], fuel='Gasolina 93', loc=null, sort='price', sel=null, activeC=null, activeR='';
+let markers=[], mMap={}, userM=null;
 
 // Mobile
 function showTab(t){
@@ -191,8 +197,8 @@ function showTab(t){
     else{s.classList.remove('collapsed');tabs[0].classList.add('active');}
 }
 
-// Map
-const map=L.map('map',{center:[-23.4,-69.5],zoom:7,zoomControl:false});
+// Map - Chile center
+const map=L.map('map',{center:[-33.45,-70.65],zoom:5,zoomControl:false});
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM',maxZoom:19}).addTo(map);
 
@@ -202,8 +208,8 @@ async function fetchData(){
         const r=await fetch('/api/estaciones'), d=await r.json();
         all=d.estaciones||[];
         const b=document.getElementById('badge');
-        b.textContent=d.source==='fallback'?'Referencia':'CNE oficial';
-        buildChips(); apply();
+        b.textContent=d.source==='fallback'?'Referencia':`${all.length} estaciones`;
+        buildRegions(); buildChips(); apply();
         document.getElementById('loading').classList.add('hidden');
     }catch(e){document.querySelector('.loading-text').textContent='Error cargando datos.';}
 }
@@ -211,15 +217,24 @@ async function fetchData(){
 async function refreshData(){
     document.getElementById('loading').classList.remove('hidden');
     document.querySelector('.loading-text').textContent='Actualizando...';
-    try{const r=await fetch('/api/refresh'),d=await r.json();all=d.estaciones||[];buildChips();apply();}catch(e){}
+    try{const r=await fetch('/api/refresh'),d=await r.json();all=d.estaciones||[];buildRegions();buildChips();apply();}catch(e){}
     document.getElementById('loading').classList.add('hidden');
+}
+
+// Regions
+function buildRegions(){
+    const rs=[...new Set(all.map(e=>e.region).filter(Boolean))].sort();
+    const s=document.getElementById('regionSel');
+    s.innerHTML='<option value="">Todas las regiones</option>'+rs.map(r=>`<option value="${r}" ${activeR===r?'selected':''}>${r}</option>`).join('');
 }
 
 // Filters
 function apply(){
     fuel=document.getElementById('fuelType').value;
+    activeR=document.getElementById('regionSel').value;
     filtered=all.filter(e=>{
         if(!e.precios[fuel]) return false;
+        if(activeR&&e.region!==activeR) return false;
         if(activeC&&e.comuna!==activeC) return false;
         return true;
     });
@@ -230,7 +245,8 @@ function apply(){
 }
 
 function buildChips(){
-    const cs=[...new Set(all.map(e=>e.comuna))].sort();
+    const base=activeR?all.filter(e=>e.region===activeR):all;
+    const cs=[...new Set(base.map(e=>e.comuna).filter(Boolean))].sort();
     document.getElementById('chips').innerHTML=
         `<button class="chip ${!activeC?'active':''}" onclick="setC(null)">Todas</button>`+
         cs.map(c=>`<button class="chip ${activeC===c?'active':''}" onclick="setC('${c}')">${c}</button>`).join('');
@@ -258,7 +274,7 @@ function render(){
             return `<span class="ptag ${s?'sel':''}"><span class="type">${t.replace('Gasolina ','G')}</span> <span class="val">$${v.toLocaleString('es-CL')}</span></span>`;
         }).join('');
         let di='';
-        if(loc){const km=dist(e).toFixed(1);di=`<div class="card-dist"><span><strong>${km}</strong> km</span></div>`;}
+        if(loc){const km=dist(e).toFixed(1);di=`<div class="card-dist"><span><strong>${km}</strong> km</span><a href="https://www.google.com/maps/dir/?api=1&destination=${e.lat},${e.lng}&travelmode=driving" target="_blank" style="margin-left:auto;color:#059669;font-weight:600;text-decoration:none;font-size:12px">Ir &rarr;</a></div>`;}
         return `<div class="card ${cheap?'cheapest':''} ${act?'active':''}" onclick="pick('${e.id}')" id="c-${e.id}">
             ${cheap?'<div class="cheapest-label">Mas barata</div>':''}
             <div class="card-top"><span class="card-name">${e.distribuidor}</span><span class="card-brand ${bc}">${e.distribuidor}</span></div>
@@ -299,18 +315,20 @@ function pick(id){
 
 function navTo(lat,lng){window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`,'_blank');}
 
-// Location
+// Location - tiempo real
+let watchId=null;
 function getLocation(){
     const b=document.getElementById('btnLoc');
+    if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;loc=null;if(userM){map.removeLayer(userM);userM=null;}b.textContent='Usar mi ubicacion';b.classList.remove('active');apply();return;}
     b.textContent='Obteniendo...';
     if(!navigator.geolocation){b.textContent='No disponible';return;}
-    navigator.geolocation.getCurrentPosition(p=>{
+    watchId=navigator.geolocation.watchPosition(p=>{
         loc={lat:p.coords.latitude,lng:p.coords.longitude};
-        b.textContent='Ubicacion OK';b.classList.add('active');
+        b.textContent='GPS activo';b.classList.add('active');
         if(userM)map.removeLayer(userM);
         userM=L.marker([loc.lat,loc.lng],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
         apply();
-    },()=>{b.textContent='Usar mi ubicacion';alert('No se pudo obtener ubicacion');},{enableHighAccuracy:true,timeout:10000});
+    },()=>{b.textContent='Usar mi ubicacion';alert('No se pudo obtener ubicacion');},{enableHighAccuracy:true,timeout:15000,maximumAge:5000});
 }
 
 map.on('click',function(e){
@@ -338,6 +356,7 @@ function brand(b){
 }
 
 document.getElementById('fuelType').addEventListener('change',apply);
+document.getElementById('regionSel').addEventListener('change',()=>{activeC=null;buildChips();apply();});
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 fetchData();
 </script>
