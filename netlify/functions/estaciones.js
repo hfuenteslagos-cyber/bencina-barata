@@ -1,5 +1,6 @@
 // Netlify serverless function - API oficial CNE (Comision Nacional de Energia)
 const https = require('https');
+const zlib = require('zlib');
 
 const CNE_LOGIN_URL = 'https://api.cne.cl/api/login';
 const CNE_ESTACIONES_URL = 'https://api.cne.cl/api/v4/estaciones';
@@ -111,15 +112,24 @@ function fetchJSON(url, token) {
       headers: {
         'Authorization': 'Bearer ' + token,
         'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
       },
-      timeout: 15000,
+      timeout: 20000,
     }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('JSON parse error: ' + data.substring(0, 200))); }
+      const chunks = [];
+      const encoding = res.headers['content-encoding'];
+      const stream = (encoding === 'gzip') ? res.pipe(zlib.createGunzip()) :
+                     (encoding === 'deflate') ? res.pipe(zlib.createInflate()) : res;
+      stream.on('data', chunk => chunks.push(chunk));
+      stream.on('end', () => {
+        try {
+          const data = Buffer.concat(chunks).toString('utf8');
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error('JSON parse error'));
+        }
       });
+      stream.on('error', reject);
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
@@ -154,25 +164,21 @@ function parseEstaciones(raw) {
       const comuna = ubi.nombre_comuna || ubi.comuna || guessComuna(lat, lng);
       const id = e.codigo || e.id || `s${estaciones.length}`;
 
-      // Precios
+      // Precios - claves: 93/A93, 95/A95, 97/A97, DI/ADI, KE, GLP
       const precios = {};
-      const preciosRaw = e.precios || {};
+      const p = e.precios || {};
 
-      // Formato: { "93": {"precio": 1513}, "95": {...}, "97": {...}, "DI": {...}, "KE": {...} }
-      if (preciosRaw['93'] && preciosRaw['93'].precio) precios['Gasolina 93'] = parseInt(preciosRaw['93'].precio);
-      if (preciosRaw['95'] && preciosRaw['95'].precio) precios['Gasolina 95'] = parseInt(preciosRaw['95'].precio);
-      if (preciosRaw['97'] && preciosRaw['97'].precio) precios['Gasolina 97'] = parseInt(preciosRaw['97'].precio);
-      if (preciosRaw['DI'] && preciosRaw['DI'].precio) precios['Diesel'] = parseInt(preciosRaw['DI'].precio);
-      if (preciosRaw['KE'] && preciosRaw['KE'].precio) precios['Kerosene'] = parseInt(preciosRaw['KE'].precio);
+      const g93 = p['93'] || p['A93'];
+      const g95 = p['95'] || p['A95'];
+      const g97 = p['97'] || p['A97'];
+      const di = p['DI'] || p['ADI'];
+      const ke = p['KE'];
 
-      // Formato alternativo: { gasolina_93: 1513, ... }
-      if (Object.keys(precios).length === 0) {
-        if (preciosRaw.gasolina_93) precios['Gasolina 93'] = parseInt(preciosRaw.gasolina_93);
-        if (preciosRaw.gasolina_95) precios['Gasolina 95'] = parseInt(preciosRaw.gasolina_95);
-        if (preciosRaw.gasolina_97) precios['Gasolina 97'] = parseInt(preciosRaw.gasolina_97);
-        if (preciosRaw.diesel) precios['Diesel'] = parseInt(preciosRaw.diesel);
-        if (preciosRaw.kerosene) precios['Kerosene'] = parseInt(preciosRaw.kerosene);
-      }
+      if (g93 && g93.precio) precios['Gasolina 93'] = Math.round(parseFloat(g93.precio));
+      if (g95 && g95.precio) precios['Gasolina 95'] = Math.round(parseFloat(g95.precio));
+      if (g97 && g97.precio) precios['Gasolina 97'] = Math.round(parseFloat(g97.precio));
+      if (di && di.precio) precios['Diesel'] = Math.round(parseFloat(di.precio));
+      if (ke && ke.precio) precios['Kerosene'] = Math.round(parseFloat(ke.precio));
 
       if (Object.keys(precios).length > 0) {
         estaciones.push({
